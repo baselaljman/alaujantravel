@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "Trip": {
+      "title": "Trip",
+      "description": "A bus trip from one city to another",
+      "type": "object",
+      "properties": {
+        "from": { "type": "string", "description": "Departure city" },
+        "to": { "type": "string", "description": "Arrival city" },
+        "date": { "type": "string", "format": "date", "description": "Departure date (YYYY-MM-DD)" },
+        "time": { "type": "string", "description": "Departure time (HH:MM)" },
+        "price": { "type": "number", "description": "Price per seat" },
+        "busType": { "type": "string", "enum": ["VIP", "Standard"], "description": "Type of bus" },
+        "totalSeats": { "type": "integer", "description": "Total number of seats" },
+        "availableSeats": { "type": "integer", "description": "Number of seats currently available" },
+        "status": { "type": "string", "enum": ["active", "cancelled", "completed"], "description": "Current status of the trip" }
+      },
+      "required": ["from", "to", "date", "time", "price", "totalSeats"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A seat reservation for a trip",
+      "type": "object",
+      "properties": {
+        "tripId": { "type": "string", "description": "Reference to the Trip ID" },
+        "userId": { "type": "string", "description": "Reference to the User ID" },
+        "seatNumber": { "type": "integer", "description": "The selected seat number" },
+        "passengerName": { "type": "string", "description": "Name of the passenger" },
+        "passengerPhone": { "type": "string", "description": "Phone number of the passenger" },
+        "passengerEmail": { "type": "string", "description": "Email of the passenger" },
+        "passportNumber": { "type": "string", "description": "Passport number of the passenger" },
+        "paymentMethod": { "type": "string", "enum": ["online", "later"], "description": "Payment method chosen" },
+        "bookingDate": { "type": "string", "format": "date-time", "description": "When the booking was made" },
+        "status": { "type": "string", "enum": ["confirmed", "pending", "cancelled"], "description": "Status of the booking" }
+      },
+      "required": ["tripId", "userId", "seatNumber", "passengerName", "passengerPhone"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID" },
+        "displayName": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "phoneNumber": { "type": "string", "description": "Phone number" },
+        "role": { "type": "string", "enum": ["user", "admin", "driver", "staff"], "description": "User role" },
+        "permissions": { "type": "array", "items": { "type": "string" }, "description": "Staff permissions" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation date" }
+      },
+      "required": ["displayName", "email", "role"]
+    },
+    "Bus": {
+      "title": "Bus",
+      "description": "Bus vehicle information",
+      "type": "object",
+      "properties": {
+        "plateNumber": { "type": "string", "description": "Plate number" },
+        "busNumber": { "type": "string", "description": "Internal bus number" },
+        "model": { "type": "string", "description": "Bus model" },
+        "capacity": { "type": "integer", "description": "Total seats" },
+        "type": { "type": "string", "enum": ["VIP", "Standard"], "description": "Bus type" },
+        "status": { "type": "string", "enum": ["active", "maintenance", "inactive"], "description": "Bus status" },
+        "driverId": { "type": "string", "description": "Assigned driver ID" }
+      },
+      "required": ["plateNumber", "busNumber", "capacity", "type", "status"]
+    }
+  },
+  "firestore": {
+    "/trips": {
+      "schema": "Trip",
+      "description": "Collection of all available bus trips"
+    },
+    "/bookings": {
+      "schema": "Booking",
+      "description": "Collection of all seat reservations"
+    },
+    "/users": {
+      "schema": "User",
+      "description": "Collection of user profiles"
+    },
+    "/buses": {
+      "schema": "Bus",
+      "description": "Collection of bus vehicles"
+    },
+    "/metadata": {
+      "schema": "object",
+      "description": "System metadata and counters"
+    }
+  }
+}

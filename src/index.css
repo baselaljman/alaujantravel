@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: "Inter", "Cairo", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    direction: rtl;
+  }
+  body {
+    @apply bg-stone-50 text-stone-900;
+  }
+}
+
+.glass {
+  @apply bg-white/80 backdrop-blur-md border border-white/20;
+}
+
+.btn-primary {
+  @apply bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl transition-all font-medium shadow-md hover:shadow-lg active:scale-95;
+}
+
+.card {
+  @apply bg-white rounded-2xl p-6 shadow-sm border border-stone-100;
+}
+
