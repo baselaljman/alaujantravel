@@ -25,6 +25,7 @@ export default function DriverDashboard() {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [passengers, setPassengers] = useState<any[]>([]);
   const watcherIdRef = React.useRef<string | null>(null);
+  const latestLocationRef = React.useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -73,65 +74,72 @@ export default function DriverDashboard() {
 
   useEffect(() => {
     let watchId: number;
-    let bgWatcherId: string;
+    let syncInterval: NodeJS.Timeout;
 
     const startTracking = async () => {
       if (!isBroadcasting || !activeTrip || !user) return;
 
-      // Check if running on native mobile
+      // 1. Start the Sync Interval (Every 10 seconds)
+      syncInterval = setInterval(async () => {
+        if (latestLocationRef.current && activeTrip && user) {
+          const locationData: LiveLocation = {
+            driverId: user.uid,
+            tripId: activeTrip.id,
+            lat: latestLocationRef.current.lat,
+            lng: latestLocationRef.current.lng,
+            lastUpdated: new Date().toISOString(),
+          };
+          try {
+            await setDoc(doc(db, 'locations', activeTrip.id), locationData);
+            console.log('Location synced to Firestore (10s interval)');
+          } catch (err) {
+            console.error('Error syncing location:', err);
+          }
+        }
+      }, 10000);
+
+      // 2. Start GPS Watcher
       const isNative = (window as any).Capacitor?.isNativePlatform();
 
       if (isNative) {
         try {
-          // Request permissions for mobile
           const permissions = await Geolocation.requestPermissions();
           if (permissions.location !== 'granted') {
             alert('يرجى منح صلاحية الوصول للموقع لتمكين التتبع');
             return;
           }
 
-          // Use Background Geolocation for mobile
-          bgWatcherId = await BackgroundGeolocation.addWatcher(
+          watcherIdRef.current = await BackgroundGeolocation.addWatcher(
             {
               backgroundMessage: "يتم تتبع موقع الحافلة الآن لتزويد الركاب بالمعلومات",
               backgroundTitle: "تتبع الموقع نشط",
               requestPermissions: true,
               stale: false,
-              distanceFilter: 10 // Update every 10 meters
+              distanceFilter: 5 // Get updates every 5 meters to keep buffer fresh
             },
-            async (location, error) => {
+            (location, error) => {
               if (error) {
                 console.error('Background Geolocation error:', error);
                 return;
               }
               if (location) {
-                const locationData: LiveLocation = {
-                  driverId: user.uid,
-                  tripId: activeTrip.id,
+                latestLocationRef.current = {
                   lat: location.latitude,
-                  lng: location.longitude,
-                  lastUpdated: new Date().toISOString(),
+                  lng: location.longitude
                 };
-                await setDoc(doc(db, 'locations', activeTrip.id), locationData);
               }
             }
           );
-          watcherIdRef.current = bgWatcherId;
         } catch (err) {
           console.error('Failed to start background tracking:', err);
         }
       } else {
-        // Fallback to Web API for browser
         watchId = navigator.geolocation.watchPosition(
-          async (pos) => {
-            const locationData: LiveLocation = {
-              driverId: user.uid,
-              tripId: activeTrip.id,
+          (pos) => {
+            latestLocationRef.current = {
               lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              lastUpdated: new Date().toISOString(),
+              lng: pos.coords.longitude
             };
-            await setDoc(doc(db, 'locations', activeTrip.id), locationData);
           },
           (err) => console.error('Geolocation error:', err),
           { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
@@ -143,6 +151,7 @@ export default function DriverDashboard() {
 
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (syncInterval) clearInterval(syncInterval);
       if (watcherIdRef.current) {
         BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current });
         watcherIdRef.current = null;
