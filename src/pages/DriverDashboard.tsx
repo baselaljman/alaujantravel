@@ -25,7 +25,34 @@ export default function DriverDashboard() {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [passengers, setPassengers] = useState<any[]>([]);
   const watcherIdRef = React.useRef<string | null>(null);
-  const latestLocationRef = React.useRef<{ lat: number; lng: number } | null>(null);
+  const lastSyncTimeRef = React.useRef<number>(0);
+  const activeTripRef = React.useRef<Trip | null>(null);
+  const userRef = React.useRef<any>(null);
+  const [showBatteryWarning, setShowBatteryWarning] = useState(false);
+
+  useEffect(() => {
+    activeTripRef.current = activeTrip;
+  }, [activeTrip]);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    // Check if we are on Android to show battery warning
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid && isBroadcasting) {
+      setShowBatteryWarning(true);
+    }
+  }, [isBroadcasting]);
+
+  const openSettings = async () => {
+    try {
+      await BackgroundGeolocation.openSettings();
+    } catch (err) {
+      console.error('Could not open settings:', err);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -74,31 +101,10 @@ export default function DriverDashboard() {
 
   useEffect(() => {
     let watchId: number;
-    let syncInterval: NodeJS.Timeout;
 
     const startTracking = async () => {
-      if (!isBroadcasting || !activeTrip || !user) return;
+      if (!isBroadcasting || !activeTripRef.current || !userRef.current) return;
 
-      // 1. Start the Sync Interval (Every 10 seconds)
-      syncInterval = setInterval(async () => {
-        if (latestLocationRef.current && activeTrip && user) {
-          const locationData: LiveLocation = {
-            driverId: user.uid,
-            tripId: activeTrip.id,
-            lat: latestLocationRef.current.lat,
-            lng: latestLocationRef.current.lng,
-            lastUpdated: new Date().toISOString(),
-          };
-          try {
-            await setDoc(doc(db, 'locations', activeTrip.id), locationData);
-            console.log('Location synced to Firestore (10s interval)');
-          } catch (err) {
-            console.error('Error syncing location:', err);
-          }
-        }
-      }, 10000);
-
-      // 2. Start GPS Watcher
       const isNative = (window as any).Capacitor?.isNativePlatform();
 
       if (isNative) {
@@ -109,37 +115,75 @@ export default function DriverDashboard() {
             return;
           }
 
-          watcherIdRef.current = await BackgroundGeolocation.addWatcher(
-            {
-              backgroundMessage: "يتم تتبع موقع الحافلة الآن لتزويد الركاب بالمعلومات",
-              backgroundTitle: "تتبع الموقع نشط",
-              requestPermissions: true,
-              stale: false,
-              distanceFilter: 5 // Get updates every 5 meters to keep buffer fresh
-            },
-            (location, error) => {
-              if (error) {
-                console.error('Background Geolocation error:', error);
-                return;
+          // Important: We only start the watcher once and use refs inside it
+          if (!watcherIdRef.current) {
+            console.log('Starting Background Watcher with aggressive settings...');
+            watcherIdRef.current = await BackgroundGeolocation.addWatcher(
+              {
+                backgroundMessage: "يتم تتبع موقع الحافلة الآن لتزويد الركاب بالمعلومات. يرجى إبقاء التطبيق مفتوحاً في الخلفية.",
+                backgroundTitle: "تتبع الموقع نشط - العوجان للسياحة",
+                requestPermissions: true,
+                stale: false,
+                distanceFilter: 0, // Trigger on any movement
+                interval: 5000,    // Hint 5s interval for Android
+                fastestInterval: 3000,
+                priority: 100,     // PRIORITY_HIGH_ACCURACY
+                stopOnTerminate: false // Keep running even if app is swiped away
+              },
+              async (location: any, error: any) => {
+                if (error) {
+                  console.error('BG Watcher Error:', error);
+                  return;
+                }
+                
+                const currentTrip = activeTripRef.current;
+                const currentUser = userRef.current;
+
+                if (location && currentTrip && currentUser) {
+                  const now = Date.now();
+                  // Force sync every 10 seconds
+                  if (now - lastSyncTimeRef.current >= 10000) {
+                    const locationData: LiveLocation = {
+                      driverId: currentUser.uid,
+                      tripId: currentTrip.id,
+                      lat: location.latitude,
+                      lng: location.longitude,
+                      lastUpdated: new Date().toISOString(),
+                    };
+                    
+                    try {
+                      // Using setDoc directly in the callback
+                      await setDoc(doc(db, 'locations', currentTrip.id), locationData);
+                      lastSyncTimeRef.current = now;
+                      console.log(`[BG SYNC] ${new Date().toLocaleTimeString()}: ${location.latitude}, ${location.longitude}`);
+                    } catch (err) {
+                      console.error('BG Sync Error:', err);
+                    }
+                  }
+                }
               }
-              if (location) {
-                latestLocationRef.current = {
-                  lat: location.latitude,
-                  lng: location.longitude
-                };
-              }
-            }
-          );
+            );
+          }
         } catch (err) {
           console.error('Failed to start background tracking:', err);
         }
       } else {
         watchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            latestLocationRef.current = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude
-            };
+          async (pos) => {
+            const now = Date.now();
+            const currentTrip = activeTripRef.current;
+            const currentUser = userRef.current;
+            if (now - lastSyncTimeRef.current >= 10000 && currentTrip && currentUser) {
+              const locationData: LiveLocation = {
+                driverId: currentUser.uid,
+                tripId: currentTrip.id,
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                lastUpdated: new Date().toISOString(),
+              };
+              await setDoc(doc(db, 'locations', currentTrip.id), locationData);
+              lastSyncTimeRef.current = now;
+            }
           },
           (err) => console.error('Geolocation error:', err),
           { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
@@ -147,17 +191,20 @@ export default function DriverDashboard() {
       }
     };
 
-    startTracking();
+    if (isBroadcasting) {
+      startTracking();
+    }
 
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
-      if (syncInterval) clearInterval(syncInterval);
-      if (watcherIdRef.current) {
+      // We don't necessarily want to remove the watcher on every re-render
+      // but we should clean up when broadcasting stops
+      if (!isBroadcasting && watcherIdRef.current) {
         BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current });
         watcherIdRef.current = null;
       }
     };
-  }, [isBroadcasting, activeTrip, user]);
+  }, [isBroadcasting]); // Only depend on isBroadcasting to avoid re-creating watcher
 
   if (profile?.role !== 'driver') {
     return <div className="text-center py-20">عذراً، هذه الصفحة مخصصة للسائقين فقط.</div>;
@@ -165,6 +212,40 @@ export default function DriverDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      <AnimatePresence>
+        {showBatteryWarning && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 overflow-hidden"
+          >
+            <div className="flex gap-3">
+              <AlertCircle className="text-amber-600 shrink-0" size={24} />
+              <div className="space-y-2">
+                <h4 className="font-bold text-amber-900">تنبيه هام لاستمرار التتبع</h4>
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  لضمان عدم توقف التتبع عند إغلاق الشاشة، يرجى ضبط إعدادات البطارية للتطبيق على <strong>"غير مقيد" (Unrestricted)</strong>.
+                </p>
+                <div className="flex gap-3 mt-2">
+                  <button 
+                    onClick={openSettings}
+                    className="bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors"
+                  >
+                    فتح الإعدادات
+                  </button>
+                  <button 
+                    onClick={() => setShowBatteryWarning(false)}
+                    className="text-amber-600 text-xs font-bold"
+                  >
+                    فهمت ذلك
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">لوحة القائد</h1>
         {isBroadcasting && (
