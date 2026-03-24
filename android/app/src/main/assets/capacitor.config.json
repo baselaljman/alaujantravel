@@ -1,0 +1,17 @@
+{
+	"appId": "com.aloujan.bus",
+	"appName": "العوجان للسياحة والسفر",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https",
+		"hostname": "localhost",
+		"allowNavigation": [
+			"ais-pre-gklusr66slg5nx546qr4zv-402389654188.europe-west2.run.app",
+			"ais-dev-gklusr66slg5nx546qr4zv-402389654188.europe-west2.run.app",
+			"alaujantravel.com"
+		]
+	},
+	"plugins": {
+		"Geolocation": {}
+	}
+}
