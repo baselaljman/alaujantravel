@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, where, addDoc, doc, updateDoc, getDoc, arrayUnion } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Trip, Booking } from '../types';
+import { db, handleFirestoreError, OperationType, auth } from '../firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { Trip, Booking, City } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { useCurrency } from '../hooks/useCurrency';
 import { Calendar, Users, CheckCircle, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
@@ -11,14 +13,21 @@ import { useSearchParams } from 'react-router-dom';
 
 export default function BookingPage() {
   const { user, profile, login } = useAuth();
+  const { formatPrice } = useCurrency();
   const [searchParams] = useSearchParams();
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [step, setStep] = useState<'trips' | 'seats' | 'passengers' | 'contact' | 'payment' | 'success'>('trips');
   const [passengers, setPassengers] = useState<{ name: string; passport: string }[]>([]);
   const [contactPhone, setContactPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+966');
+  const [otpCode, setOtpCode] = useState('');
+  const [verificationId, setVerificationId] = useState<ConfirmationResult | null>(null);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [contactEmail, setContactEmail] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'later'>('online');
   const [loading, setLoading] = useState(false);
@@ -42,7 +51,18 @@ export default function BookingPage() {
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'trips');
     });
-    return unsubscribe;
+
+    const unsubCities = onSnapshot(collection(db, 'cities'), (snapshot) => {
+      const citiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as City));
+      setCities(citiesData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'cities');
+    });
+
+    return () => {
+      unsubscribe();
+      unsubCities();
+    };
   }, []);
 
   useEffect(() => {
@@ -63,6 +83,19 @@ export default function BookingPage() {
       if (updated) setSelectedTrip(updated);
     }
   }, [trips, searchParams]);
+
+  const getTripPrice = (trip: Trip) => {
+    const fromCity = cities.find(c => c.name === trip.from);
+    if (fromCity?.country === 'سوريا') {
+      return { value: trip.priceSYP || 0, currency: 'ل.س' };
+    }
+    return { value: trip.priceSAR || trip.price || 0, currency: 'ريال' };
+  };
+
+  const formatTripPrice = (trip: Trip) => {
+    const { value, currency } = getTripPrice(trip);
+    return `${value.toLocaleString('ar-EG')} ${currency}`;
+  };
 
   const [bookedSeats, setBookedSeats] = useState<number[]>([]);
 
@@ -102,7 +135,7 @@ export default function BookingPage() {
           bookingDate: new Date().toISOString(),
           userId: user ? user.uid : 'guest',
           passengerName: passengers[i].name || 'مسافر',
-          passengerPhone: contactPhone || '',
+          passengerPhone: `${countryCode}${contactPhone.replace(/^0+/, '')}`,
           passengerEmail: contactEmail || (user?.email || ''),
           passportNumber: passengers[i].passport || '',
         };
@@ -166,10 +199,95 @@ export default function BookingPage() {
     setStep('contact');
   };
 
+  const setupRecaptcha = () => {
+    try {
+      if ((window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier.clear();
+        (window as any).recaptchaVerifier = null;
+      }
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'normal',
+        callback: () => {
+          console.log('Recaptcha verified');
+        },
+        'expired-callback': () => {
+          console.log('Recaptcha expired');
+          if ((window as any).recaptchaVerifier) {
+            (window as any).recaptchaVerifier.clear();
+            (window as any).recaptchaVerifier = null;
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Recaptcha setup error:", err);
+    }
+  };
+
+  const sendOTP = async () => {
+    if (!contactPhone) return;
+    setLoading(true);
+    try {
+      setupRecaptcha();
+      const phoneNumber = `${countryCode}${contactPhone.replace(/^0+/, '')}`;
+      const appVerifier = (window as any).recaptchaVerifier;
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+      setVerificationId(confirmationResult);
+      setOtpSent(true);
+      alert('تم إرسال رمز التحقق إلى هاتفك');
+    } catch (error: any) {
+      console.error("OTP Error:", error);
+      alert('حدث خطأ أثناء إرسال الرمز. يرجى التأكد من صحة الرقم.');
+      if ((window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier.clear();
+        (window as any).recaptchaVerifier = null;
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOTP = async () => {
+    if (!otpCode || !verificationId) return;
+    setLoading(true);
+    try {
+      await verificationId.confirm(otpCode);
+      setIsPhoneVerified(true);
+      alert('تم التحقق من رقم الهاتف بنجاح');
+    } catch (error) {
+      console.error("Verification Error:", error);
+      alert('رمز التحقق غير صحيح');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const downloadTicket = async () => {
     const element = document.getElementById('ticket-preview');
     if (!element) return;
-    const canvas = await html2canvas(element);
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      onclone: (clonedDoc) => {
+        // Remove all existing stylesheets to prevent oklch parsing errors
+        const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+        styles.forEach(s => s.remove());
+
+        const style = clonedDoc.createElement('style');
+        style.innerHTML = `
+          :root {
+            --color-emerald-500: #10b981 !important;
+            --color-emerald-600: #059669 !important;
+            --color-emerald-700: #047857 !important;
+            --color-stone-100: #f5f5f4 !important;
+            --color-stone-400: #a8a29e !important;
+            --color-stone-500: #78716c !important;
+            --color-stone-600: #57534e !important;
+          }
+        `;
+        clonedDoc.head.appendChild(style);
+      }
+    });
     const link = document.createElement('a');
     link.download = `ticket-${bookingSuccess?.id}.png`;
     link.href = canvas.toDataURL();
@@ -200,7 +318,7 @@ export default function BookingPage() {
                 </div>
               </div>
               <div className="text-left">
-                <p className="text-emerald-600 font-black text-xl">{trip.price} ريال</p>
+                <p className="text-emerald-600 font-black text-xl">{formatTripPrice(trip)}</p>
                 <p className="text-xs text-stone-400">حافلة رقم {trip.busNumber}</p>
               </div>
             </motion.div>
@@ -243,7 +361,12 @@ export default function BookingPage() {
                 <div className="flex justify-between"><span>التاريخ:</span><span className="font-bold">{formatDateArabic(selectedTrip.date)}</span></div>
                 <div className="flex justify-between"><span>المقاعد:</span><span className="font-bold">{selectedSeats.length > 0 ? selectedSeats.join(', ') : 'لم يتم الاختيار'}</span></div>
                 <hr />
-                <div className="flex justify-between text-lg"><span>الإجمالي:</span><span className="font-black text-emerald-600">{selectedTrip.price * selectedSeats.length} ريال</span></div>
+                <div className="flex justify-between text-lg">
+                  <span>الإجمالي:</span>
+                  <span className="font-black text-emerald-600">
+                    {(getTripPrice(selectedTrip).value * selectedSeats.length).toLocaleString('ar-EG')} {getTripPrice(selectedTrip).currency}
+                  </span>
+                </div>
               </div>
               <button 
                 disabled={selectedSeats.length === 0}
@@ -312,14 +435,72 @@ export default function BookingPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs text-stone-500">رقم الهاتف</label>
-                <input 
-                  type="tel" 
-                  placeholder="رقم الهاتف (مثال: 05XXXXXXXX)" 
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
+                <div className="flex gap-2">
+                  <select 
+                    value={countryCode} 
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                  >
+                    <option value="+966">🇸🇦 +966</option>
+                    <option value="+963">🇸🇾 +963</option>
+                  </select>
+                  <input 
+                    type="tel" 
+                    placeholder="رقم الهاتف" 
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    disabled={isPhoneVerified}
+                    className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-50"
+                  />
+                </div>
+                {!otpSent && !isPhoneVerified && (
+                  <button 
+                    onClick={sendOTP}
+                    disabled={!contactPhone || loading}
+                    className="text-xs text-emerald-600 font-bold hover:underline disabled:opacity-50"
+                  >
+                    إرسال رمز التحقق (OTP)
+                  </button>
+                )}
               </div>
+
+              {otpSent && !isPhoneVerified && (
+                <div className="space-y-2 p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                  <label className="text-xs text-stone-500">أدخل رمز التحقق</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="رمز التحقق" 
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                    <button 
+                      onClick={verifyOTP}
+                      disabled={!otpCode || loading}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      تحقق
+                    </button>
+                  </div>
+                  <button 
+                    onClick={sendOTP}
+                    className="text-[10px] text-stone-400 hover:text-emerald-600"
+                  >
+                    إعادة إرسال الرمز؟
+                  </button>
+                </div>
+              )}
+
+              {isPhoneVerified && (
+                <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold bg-emerald-50 p-3 rounded-xl">
+                  <CheckCircle size={16} />
+                  تم التحقق من رقم الهاتف
+                </div>
+              )}
+
+              <div id="recaptcha-container" className="flex justify-center my-4 min-h-[78px]"></div>
+
               <div className="space-y-2">
                 <label className="text-xs text-stone-500">البريد الإلكتروني</label>
                 <input 
@@ -333,10 +514,10 @@ export default function BookingPage() {
             </div>
             <div className="bg-emerald-50 p-4 rounded-2xl space-y-2 text-sm">
               <div className="flex justify-between"><span>عدد المقاعد:</span><span className="font-bold">{selectedSeats.length}</span></div>
-              <div className="flex justify-between"><span>المبلغ الإجمالي:</span><span className="font-black text-emerald-600">{selectedTrip.price * selectedSeats.length} ريال</span></div>
+              <div className="flex justify-between"><span>المبلغ الإجمالي:</span><span className="font-black text-emerald-600">{formatPrice(getTripPrice(selectedTrip).value * selectedSeats.length)}</span></div>
             </div>
             <button 
-              disabled={!contactPhone}
+              disabled={!contactPhone || !isPhoneVerified}
               onClick={() => setStep('payment')}
               className="btn-primary w-full disabled:opacity-50"
             >
@@ -378,7 +559,9 @@ export default function BookingPage() {
             <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex justify-between items-center">
               <div>
                 <p className="text-xs text-stone-500">المبلغ المطلوب</p>
-                <p className="text-2xl font-black text-emerald-600">{selectedTrip.price * selectedSeats.length} ريال</p>
+                <p className="text-2xl font-black text-emerald-600">
+                  {(getTripPrice(selectedTrip).value * selectedSeats.length).toLocaleString('ar-EG')} {getTripPrice(selectedTrip).currency}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-stone-500">عدد التذاكر</p>
@@ -462,45 +645,73 @@ export default function BookingPage() {
               <div 
                 key={booking.id} 
                 id={`ticket-preview-${idx}`} 
-                className="bg-white p-8 rounded-3xl shadow-xl border-2 border-emerald-500 w-full max-w-md mx-auto space-y-6 relative overflow-hidden"
-                style={{ backgroundColor: '#ffffff', borderColor: '#10b981' }}
+                style={{ 
+                  backgroundColor: '#ffffff', 
+                  borderColor: '#10b981', 
+                  borderWidth: '2px',
+                  borderStyle: 'solid',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  width: '400px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '24px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
+                  textAlign: 'right',
+                  direction: 'rtl',
+                  margin: '0 auto'
+                }}
               >
                 <div 
-                  className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -mr-12 -mt-12" 
-                  style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}
+                  style={{ 
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: '96px',
+                    height: '96px',
+                    borderRadius: '9999px',
+                    marginRight: '-48px',
+                    marginTop: '-48px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)' 
+                  }}
                 />
-                <div className="flex justify-between items-start">
-                  <img src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/bus-svgrepo-com-1.svg" alt="Logo" className="w-12 h-12" />
-                  <div className="text-right">
-                    <p className="text-xs text-stone-400" style={{ color: '#a8a29e' }}>تذكرة سفر دولية</p>
-                    <p className="font-bold text-emerald-800" style={{ color: '#065f46' }}>العوجان للسياحة</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <img src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/bus-svgrepo-com-1.svg" alt="Logo" style={{ width: '48px', height: '48px' }} />
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '12px', color: '#a8a29e', margin: 0 }}>تذكرة سفر دولية</p>
+                    <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>العوجان للسياحة</p>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><p className="text-[10px] text-stone-400 uppercase" style={{ color: '#a8a29e' }}>الاسم</p><p className="font-bold">{booking.passengerName}</p></div>
-                    <div><p className="text-[10px] text-stone-400 uppercase" style={{ color: '#a8a29e' }}>رقم الجواز</p><p className="font-bold">{booking.passportNumber || '---'}</p></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الاسم</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0 }}>{booking.passengerName}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الجواز</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0 }}>{booking.passportNumber || '---'}</p></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><p className="text-[10px] text-stone-400 uppercase" style={{ color: '#a8a29e' }}>رقم الحجز</p><p className="font-mono text-xs">{booking.id.slice(0, 8)}</p></div>
-                    <div><p className="text-[10px] text-stone-400 uppercase" style={{ color: '#a8a29e' }}>الهاتف</p><p className="font-bold text-xs">{booking.passengerPhone}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الحجز</p><p style={{ fontFamily: 'monospace', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.id.slice(0, 8)}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '12px', color: '#059669', margin: 0 }}>{selectedTrip?.trackingNumber}</p></div>
                   </div>
-                  <div className="bg-emerald-50 p-4 rounded-xl flex justify-between items-center" style={{ backgroundColor: '#ecfdf5' }}>
-                    <div><p className="text-[10px] text-emerald-600 uppercase" style={{ color: '#059669' }}>من</p><p className="font-bold text-lg">{selectedTrip?.from}</p></div>
-                    <div className="text-emerald-300" style={{ color: '#6ee7b7' }}>←</div>
-                    <div className="text-left">
-                      <p className="text-[10px] text-emerald-600 uppercase" style={{ color: '#059669' }}>إلى</p>
-                      <p className="font-bold text-lg">{selectedTrip?.to}</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الهاتف</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.passengerPhone}</p></div>
+                  </div>
+                  <div style={{ backgroundColor: '#ecfdf5', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>من</p><p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{selectedTrip?.from}</p></div>
+                    <div style={{ color: '#6ee7b7' }}>←</div>
+                    <div style={{ textAlign: 'left' }}>
+                      <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>إلى</p>
+                      <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{selectedTrip?.to}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div><p className="text-[10px] text-stone-400 uppercase" style={{ color: '#a8a29e' }}>التاريخ</p><p className="font-bold text-xs">{formatDateArabic(selectedTrip?.date || '')}</p></div>
-                    <div><p className="text-[10px] text-stone-400 uppercase" style={{ color: '#a8a29e' }}>الوقت</p><p className="font-bold text-xs">{selectedTrip?.time}</p></div>
-                    <div><p className="text-[10px] text-stone-400 uppercase" style={{ color: '#a8a29e' }}>المقعد</p><p className="font-bold text-xs">{booking.seatNumber}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>التاريخ</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{formatDateArabic(selectedTrip?.date || '')}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الوقت</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{selectedTrip?.time}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>المقعد</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.seatNumber}</p></div>
                   </div>
                 </div>
-                <div className="border-t-2 border-dashed border-stone-200 pt-4 flex justify-center" style={{ borderColor: '#e7e5e4' }}>
-                  <div className="bg-stone-100 h-12 w-full rounded flex items-center justify-center text-stone-400 text-[10px] font-mono" style={{ backgroundColor: '#f5f5f4', color: '#a8a29e' }}>
+                <div style={{ borderTop: '2px dashed #e7e5e4', paddingTop: '16px', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ backgroundColor: '#f5f5f4', height: '48px', width: '100%', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontFamily: 'monospace', color: '#a8a29e' }}>
                     BARCODE_{booking.id.slice(0, 6)}
                   </div>
                 </div>
@@ -513,7 +724,30 @@ export default function BookingPage() {
               for (let i = 0; i < bookingSuccess.length; i++) {
                 const element = document.getElementById(`ticket-preview-${i}`);
                 if (element) {
-                  const canvas = await html2canvas(element);
+                  const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    onclone: (clonedDoc) => {
+                      // Remove all existing stylesheets to prevent oklch parsing errors
+                      const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+                      styles.forEach(s => s.remove());
+
+                      const style = clonedDoc.createElement('style');
+                      style.innerHTML = `
+                        :root {
+                          --color-emerald-500: #10b981 !important;
+                          --color-emerald-600: #059669 !important;
+                          --color-emerald-700: #047857 !important;
+                          --color-stone-100: #f5f5f4 !important;
+                          --color-stone-400: #a8a29e !important;
+                          --color-stone-500: #78716c !important;
+                          --color-stone-600: #57534e !important;
+                        }
+                      `;
+                      clonedDoc.head.appendChild(style);
+                    }
+                  });
                   const link = document.createElement('a');
                   link.download = `ticket-${bookingSuccess[i].id}.png`;
                   link.href = canvas.toDataURL();

@@ -1,15 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, where, onSnapshot, or } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { Booking, Trip } from '../types';
-import { Calendar, MapPin, Ticket, User } from 'lucide-react';
+import { Calendar, Download, MapPin, Ticket, User, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import html2canvas from 'html2canvas';
 
 export default function Profile() {
   const { user, profile } = useAuth();
   const [bookings, setBookings] = useState<(Booking & { trip?: Trip })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const ticketRef = useRef<HTMLDivElement>(null);
+
+  const formatDateArabic = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return new Intl.DateTimeFormat('ar-SA', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }).format(date);
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const handleDownloadTicket = async (booking: Booking, trip?: Trip) => {
+    if (!trip) return;
+    setDownloadingId(booking.id);
+    
+    // Small delay to ensure the ticket is rendered in the hidden div
+    setTimeout(async () => {
+      try {
+        const element = document.getElementById(`ticket-to-download-${booking.id}`);
+        if (element) {
+          const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            onclone: (clonedDoc) => {
+              // Remove all existing stylesheets to prevent oklch parsing errors
+              const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+              styles.forEach(s => s.remove());
+
+              const style = clonedDoc.createElement('style');
+              style.innerHTML = `
+                :root {
+                  --color-emerald-500: #10b981 !important;
+                  --color-emerald-600: #059669 !important;
+                  --color-emerald-700: #047857 !important;
+                  --color-stone-100: #f5f5f4 !important;
+                  --color-stone-400: #a8a29e !important;
+                  --color-stone-500: #78716c !important;
+                  --color-stone-600: #57534e !important;
+                }
+              `;
+              clonedDoc.head.appendChild(style);
+            }
+          });
+          const link = document.createElement('a');
+          link.download = `ticket-${booking.id.slice(0, 8)}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        }
+      } catch (error) {
+        console.error('Error generating ticket:', error);
+      } finally {
+        setDownloadingId(null);
+      }
+    }, 100);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -54,6 +117,8 @@ export default function Profile() {
         tripsMap[doc.id] = { id: doc.id, ...doc.data() } as Trip;
       });
       setTrips(tripsMap);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'trips');
     });
     return unsubscribe;
   }, []);
@@ -115,29 +180,110 @@ export default function Profile() {
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-wrap gap-4 items-center">
-                    <div className="text-right">
-                      <p className="text-[10px] text-stone-400 uppercase">الراكب</p>
-                      <p className="text-sm font-bold">{booking.passengerName}</p>
+                                    <div className="flex flex-wrap gap-4 items-center">
+                      <div className="text-right">
+                        <p className="text-[10px] text-stone-400 uppercase">الراكب</p>
+                        <p className="text-sm font-bold">{booking.passengerName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-stone-400 uppercase">المقعد</p>
+                        <p className="text-sm font-bold">{booking.seatNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-stone-400 uppercase">الحالة</p>
+                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${
+                          booking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-600'
+                        }`}>
+                          {booking.status === 'confirmed' ? 'مؤكد' : booking.status}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => handleDownloadTicket(booking, trip)}
+                        disabled={downloadingId === booking.id || !trip}
+                        className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                        title="تحميل التذكرة"
+                      >
+                        {downloadingId === booking.id ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                      </button>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-stone-400 uppercase">رقم الجواز</p>
-                      <p className="text-sm font-bold">{booking.passportNumber || '---'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-stone-400 uppercase">المقعد</p>
-                      <p className="text-sm font-bold">{booking.seatNumber}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-stone-400 uppercase">الحالة</p>
-                      <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${
-                        booking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-600'
-                      }`}>
-                        {booking.status === 'confirmed' ? 'مؤكد' : booking.status}
-                      </span>
-                    </div>
-                  </div>
+
+                    {/* Hidden Ticket Template for Download */}
+                    {trip && (
+                      <div className="fixed -left-[9999px] top-0">
+                        <div 
+                          id={`ticket-to-download-${booking.id}`}
+                          style={{ 
+                            backgroundColor: '#ffffff', 
+                            borderColor: '#10b981', 
+                            borderWidth: '2px',
+                            borderStyle: 'solid',
+                            borderRadius: '24px',
+                            padding: '32px',
+                            width: '400px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '24px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            boxSizing: 'border-box',
+                            textAlign: 'right',
+                            direction: 'rtl'
+                          }}
+                        >
+                          <div 
+                            style={{ 
+                              position: 'absolute',
+                              top: 0,
+                              right: 0,
+                              width: '96px',
+                              height: '96px',
+                              borderRadius: '9999px',
+                              marginRight: '-48px',
+                              marginTop: '-48px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.1)' 
+                            }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <img src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/bus-svgrepo-com-1.svg" alt="Logo" style={{ width: '48px', height: '48px' }} />
+                            <div style={{ textAlign: 'right' }}>
+                              <p style={{ fontSize: '12px', color: '#a8a29e', margin: 0 }}>تذكرة سفر دولية</p>
+                              <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>العوجان للسياحة</p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الاسم</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0 }}>{booking.passengerName}</p></div>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الجواز</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0 }}>{booking.passportNumber || '---'}</p></div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الحجز</p><p style={{ fontFamily: 'monospace', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.id.slice(0, 8)}</p></div>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '12px', color: '#059669', margin: 0 }}>{trip.trackingNumber}</p></div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الهاتف</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.passengerPhone}</p></div>
+                            </div>
+                            <div style={{ backgroundColor: '#ecfdf5', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>من</p><p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{trip.from}</p></div>
+                              <div style={{ color: '#6ee7b7' }}>←</div>
+                              <div style={{ textAlign: 'left' }}>
+                                <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>إلى</p>
+                                <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{trip.to}</p>
+                              </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>التاريخ</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{formatDateArabic(trip.date)}</p></div>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الوقت</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{trip.time}</p></div>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>المقعد</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.seatNumber}</p></div>
+                            </div>
+                          </div>
+                          <div style={{ borderTop: '2px dashed #e7e5e4', paddingTop: '16px', display: 'flex', justifyContent: 'center' }}>
+                            <div style={{ backgroundColor: '#f5f5f4', height: '48px', width: '100%', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontFamily: 'monospace', color: '#a8a29e' }}>
+                              BARCODE_{booking.id.slice(0, 6)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                 </motion.div>
               );
             })}

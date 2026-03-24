@@ -9,7 +9,9 @@
         "to": { "type": "string", "description": "Arrival city" },
         "date": { "type": "string", "format": "date", "description": "Departure date (YYYY-MM-DD)" },
         "time": { "type": "string", "description": "Departure time (HH:MM)" },
-        "price": { "type": "number", "description": "Price per seat" },
+        "price": { "type": "number", "description": "Default price (usually SAR)" },
+        "priceSAR": { "type": "number", "description": "Price in Saudi Riyals" },
+        "priceSYP": { "type": "number", "description": "Price in Syrian Pounds" },
         "busType": { "type": "string", "enum": ["VIP", "Standard"], "description": "Type of bus" },
         "totalSeats": { "type": "integer", "description": "Total number of seats" },
         "availableSeats": { "type": "integer", "description": "Number of seats currently available" },
@@ -64,6 +66,58 @@
         "driverId": { "type": "string", "description": "Assigned driver ID" }
       },
       "required": ["plateNumber", "busNumber", "capacity", "type", "status"]
+    },
+    "City": {
+      "title": "City",
+      "description": "City information for travel routes",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the city" },
+        "country": { "type": "string", "description": "Country name or ID" }
+      },
+      "required": ["name", "country"]
+    },
+    "Country": {
+      "title": "Country",
+      "description": "Country information for travel routes",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the country" }
+      },
+      "required": ["name"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Dynamic banner image for the home page",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string", "description": "URL of the banner image" },
+        "link": { "type": "string", "description": "Optional link when clicking the banner" },
+        "order": { "type": "integer", "description": "Display order" },
+        "active": { "type": "boolean", "description": "Whether the banner is active" }
+      },
+      "required": ["imageUrl", "order", "active"]
+    },
+    "Parcel": {
+      "title": "Parcel",
+      "description": "A shipment package sent between cities",
+      "type": "object",
+      "properties": {
+        "senderName": { "type": "string", "description": "Name of the sender" },
+        "senderPhone": { "type": "string", "description": "Phone number of the sender" },
+        "receiverName": { "type": "string", "description": "Name of the receiver" },
+        "receiverPhone": { "type": "string", "description": "Phone number of the receiver" },
+        "from": { "type": "string", "description": "Origin city" },
+        "to": { "type": "string", "description": "Destination city" },
+        "tripId": { "type": "string", "description": "Linked trip ID" },
+        "trackingNumber": { "type": "string", "description": "Tracking number (matches trip)" },
+        "note": { "type": "string", "description": "Additional notes" },
+        "price": { "type": "number", "description": "Shipping cost" },
+        "currency": { "type": "string", "enum": ["SAR", "SYP"], "description": "Currency of the shipping cost" },
+        "status": { "type": "string", "enum": ["pending", "shipped", "delivered"], "description": "Current status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["senderName", "senderPhone", "receiverName", "receiverPhone", "from", "to", "tripId", "trackingNumber", "price", "status"]
     }
   },
   "firestore": {
@@ -83,9 +137,25 @@
       "schema": "Bus",
       "description": "Collection of bus vehicles"
     },
+    "/cities": {
+      "schema": "City",
+      "description": "Collection of cities for travel routes"
+    },
+    "/countries": {
+      "schema": "Country",
+      "description": "Collection of countries for travel routes"
+    },
     "/metadata": {
       "schema": "object",
       "description": "System metadata and counters"
+    },
+    "/banners": {
+      "schema": "Banner",
+      "description": "Collection of home page banner images"
+    },
+    "/parcels": {
+      "schema": "Parcel",
+      "description": "Collection of all shipments"
     }
   }
 }

@@ -1,36 +1,96 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Shield, Clock, Phone, Search, Calendar, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import { arSA } from 'date-fns/locale/ar-SA';
 import "react-datepicker/dist/react-datepicker.css";
+import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { City, Banner } from '../types';
+import { AnimatePresence } from 'framer-motion';
 
 registerLocale('ar-SA', arSA);
 
 export default function Home() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState({ from: 'الرياض', to: 'دمشق', date: '' });
+  const [cities, setCities] = useState<City[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [currentBanner, setCurrentBanner] = useState(0);
+  const [search, setSearch] = useState({ from: '', to: '', date: '' });
 
-  const destinations = [
-    { name: 'الرياض', image: 'https://picsum.photos/seed/riyadh/800/600' },
-    { name: 'دمشق', image: 'https://picsum.photos/seed/damascus/800/600' },
-    { name: 'عمان', image: 'https://picsum.photos/seed/amman/800/600' },
-  ];
+  useEffect(() => {
+    const bannersQuery = query(
+      collection(db, 'banners'),
+      where('active', '==', true),
+      orderBy('order', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(bannersQuery, (snapshot) => {
+      const bannersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Banner));
+      setBanners(bannersData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'banners');
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (banners.length > 1) {
+      const timer = setInterval(() => {
+        setCurrentBanner((prev) => (prev + 1) % banners.length);
+      }, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [banners.length]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'cities'), (snapshot) => {
+      const citiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as City));
+      setCities(citiesData);
+      
+      // Set default values if cities exist
+      if (citiesData.length > 0) {
+        // Find two cities from different countries
+        const firstCity = citiesData[0];
+        const secondCity = citiesData.find(c => c.country !== firstCity.country);
+        
+        if (firstCity && secondCity) {
+          setSearch(prev => ({
+            ...prev,
+            from: firstCity.name,
+            to: secondCity.name
+          }));
+        } else if (firstCity) {
+          // Fallback if only one country exists
+          setSearch(prev => ({ ...prev, from: firstCity.name }));
+        }
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'cities');
+    });
+    return unsubscribe;
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     navigate(`/booking?from=${search.from}&to=${search.to}&date=${search.date}`);
   };
 
+  const fromCity = cities.find(c => c.name === search.from);
+  const filteredToCities = fromCity 
+    ? cities.filter(c => c.country !== fromCity.country)
+    : cities;
+
   return (
     <div className="space-y-12">
       {/* Hero Section */}
-      <section className="relative min-h-[600px] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <section className="relative min-h-[300px] sm:min-h-[600px] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <img 
-          src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/busbanar.png" 
+          src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/busbanar.png?alt=media" 
           alt="Bus Banner" 
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
         
@@ -56,12 +116,23 @@ export default function Home() {
                 <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600" size={18} />
                 <select 
                   value={search.from}
-                  onChange={(e) => setSearch({...search, from: e.target.value})}
+                  onChange={(e) => {
+                    const newFrom = e.target.value;
+                    const newFromCity = cities.find(c => c.name === newFrom);
+                    const currentToCity = cities.find(c => c.name === search.to);
+                    
+                    let newTo = search.to;
+                    // If the new "From" country is the same as current "To" country, reset "To"
+                    if (newFromCity && currentToCity && newFromCity.country === currentToCity.country) {
+                      const otherCountryCities = cities.filter(c => c.country !== newFromCity.country);
+                      newTo = otherCountryCities.length > 0 ? otherCountryCities[0].name : '';
+                    }
+                    
+                    setSearch({...search, from: newFrom, to: newTo});
+                  }}
                   className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
                 >
-                  <option>الرياض</option>
-                  <option>دمشق</option>
-                  <option>عمان</option>
+                  {cities.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
               </div>
             </div>
@@ -75,9 +146,7 @@ export default function Home() {
                   onChange={(e) => setSearch({...search, to: e.target.value})}
                   className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
                 >
-                  <option>دمشق</option>
-                  <option>الرياض</option>
-                  <option>عمان</option>
+                  {filteredToCities.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
               </div>
             </div>
@@ -108,28 +177,55 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Destinations */}
-      <section>
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          <MapPin className="text-emerald-600" />
-          وجهاتنا الرئيسية
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {destinations.map((dest, idx) => (
-            <motion.div 
-              key={dest.name}
-              whileHover={{ y: -10 }}
-              className="card group cursor-pointer overflow-hidden p-0"
+      {/* Dynamic Banners Section */}
+      <section className="relative h-[300px] sm:h-[400px] rounded-3xl overflow-hidden shadow-xl group">
+        {banners.length > 0 ? (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={banners[currentBanner].id}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.5 }}
+              className="absolute inset-0"
             >
-              <div className="h-48 overflow-hidden">
-                <img src={dest.image} alt={dest.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-              </div>
-              <div className="p-4 text-center">
-                <h3 className="text-xl font-bold">{dest.name}</h3>
-              </div>
+              {banners[currentBanner].link ? (
+                <Link to={banners[currentBanner].link!}>
+                  <img 
+                    src={banners[currentBanner].imageUrl} 
+                    alt={`Banner ${currentBanner}`}
+                    className="w-full h-full object-cover"
+                  />
+                </Link>
+              ) : (
+                <img 
+                  src={banners[currentBanner].imageUrl} 
+                  alt={`Banner ${currentBanner}`}
+                  className="w-full h-full object-cover"
+                />
+              )}
             </motion.div>
-          ))}
-        </div>
+          </AnimatePresence>
+        ) : (
+          <div className="w-full h-full bg-stone-100 flex items-center justify-center text-stone-400">
+            <Package size={48} className="opacity-20" />
+          </div>
+        )}
+        
+        {/* Banner Indicators */}
+        {banners.length > 1 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            {banners.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentBanner(idx)}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  idx === currentBanner ? 'bg-white w-6' : 'bg-white/50'
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Parcel Services */}
@@ -141,10 +237,17 @@ export default function Home() {
               <Package size={18} />
               <span>خدمات الشحن الدولي</span>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-black leading-tight">شحن الطرود بين الرياض وعمان ودمشق</h2>
+            <h2 className="text-3xl sm:text-4xl font-black leading-tight">شحن الطرود بين جميع دول الخليج وسوريا</h2>
             <p className="text-emerald-100 text-lg">نقدم خدمات شحن آمنة وسريعة لطرودكم مع إمكانية التتبع اللحظي لمسار الشحنة حتى وصولها.</p>
             <div className="flex flex-wrap gap-4">
-              <Link to="/tracking" className="btn-primary bg-white text-emerald-900 hover:bg-emerald-50">تتبع طردك الآن</Link>
+              <a 
+                href="https://wa.me/966500069261" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="btn-primary bg-white text-emerald-900 hover:bg-emerald-50"
+              >
+                تواصل معنا واتساب
+              </a>
               <div className="flex items-center gap-2 text-sm text-emerald-200">
                 <Shield size={16} />
                 <span>تأمين شامل على الشحنات</span>

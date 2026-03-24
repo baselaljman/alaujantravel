@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, getDocs, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Parcel, LiveLocation, Trip } from '../types';
 import { Package, MapPin, Search, Truck, CheckCircle, Clock } from 'lucide-react';
@@ -14,6 +14,22 @@ const DefaultIcon = L.icon({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41]
+});
+
+const AujanIcon = L.divIcon({
+  html: `
+    <div style="display: flex; flex-direction: column; align-items: center;">
+      <div style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #059669; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        <img src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" style="width: 32px; height: 32px; object-fit: contain;" />
+      </div>
+      <div style="background: #059669; color: white; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 9999px; margin-top: 4px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); white-space: nowrap;">
+        العوجان
+      </div>
+    </div>
+  `,
+  className: '',
+  iconSize: [40, 60],
+  iconAnchor: [20, 50],
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
@@ -31,6 +47,15 @@ export default function TrackingPage() {
   const [parcel, setParcel] = useState<Parcel | null>(null);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [liveLocation, setLiveLocation] = useState<LiveLocation | null>(null);
+  const unsubscribeRef = React.useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, []);
   const [activeTrips, setActiveTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -53,29 +78,47 @@ export default function TrackingPage() {
     setTrip(null);
     setLiveLocation(null);
 
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+
     try {
-      // Search in parcels
-      const parcelQuery = query(collection(db, 'parcels'), where('trackingNumber', '==', trackingNumber.trim()));
-      const parcelSnap = await getDocs(parcelQuery);
+      // Search in both collections simultaneously
+      const [parcelSnap, tripSnap] = await Promise.all([
+        getDocs(query(collection(db, 'parcels'), where('trackingNumber', '==', trackingNumber.trim()))),
+        getDocs(query(collection(db, 'trips'), where('trackingNumber', '==', trackingNumber.trim())))
+      ]);
       
+      let foundParcel: Parcel | null = null;
+      let foundTrip: Trip | null = null;
+
       if (!parcelSnap.empty) {
-        setParcel({ id: parcelSnap.docs[0].id, ...parcelSnap.docs[0].data() } as Parcel);
-      } else {
-        // Search in trips
-        const tripQuery = query(collection(db, 'trips'), where('trackingNumber', '==', trackingNumber.trim()));
-        const tripSnap = await getDocs(tripQuery);
-        
-        if (!tripSnap.empty) {
-          const tripData = { id: tripSnap.docs[0].id, ...tripSnap.docs[0].data() } as Trip;
-          setTrip(tripData);
-          if (tripData.status === 'active') {
-            trackTrip(tripData.id);
-          }
-        } else {
-          setError('رقم التتبع غير صحيح أو غير موجود.');
+        foundParcel = { id: parcelSnap.docs[0].id, ...parcelSnap.docs[0].data() } as Parcel;
+        setParcel(foundParcel);
+      }
+
+      if (!tripSnap.empty) {
+        foundTrip = { id: tripSnap.docs[0].id, ...tripSnap.docs[0].data() } as Trip;
+        setTrip(foundTrip);
+      } else if (foundParcel && foundParcel.tripId) {
+        // If parcel found but trip not found by tracking number, fetch trip by ID
+        const tripDoc = await getDoc(doc(db, 'trips', foundParcel.tripId));
+        if (tripDoc.exists()) {
+          foundTrip = { id: tripDoc.id, ...tripDoc.data() } as Trip;
+          setTrip(foundTrip);
         }
       }
+
+      if (foundTrip && foundTrip.status === 'active') {
+        trackTrip(foundTrip.id);
+      }
+
+      if (!foundParcel && !foundTrip) {
+        setError('رقم التتبع غير صحيح أو غير موجود.');
+      }
     } catch (err) {
+      console.error('Tracking error:', err);
       setError('حدث خطأ أثناء البحث.');
     } finally {
       setLoading(false);
@@ -84,7 +127,7 @@ export default function TrackingPage() {
 
   const trackTrip = (tripId: string) => {
     const locationRef = doc(db, 'locations', tripId);
-    onSnapshot(locationRef, (snapshot) => {
+    unsubscribeRef.current = onSnapshot(locationRef, (snapshot) => {
       if (snapshot.exists()) {
         setLiveLocation(snapshot.data() as LiveLocation);
       }
@@ -99,7 +142,7 @@ export default function TrackingPage() {
       <section className="space-y-6">
         <h2 className="text-2xl font-bold flex items-center gap-2">
           <Search className="text-emerald-600" />
-          تتبع الرحلات والطرود
+          تتبع الطرد والرحلات
         </h2>
         <div className="card flex gap-4">
           <input
@@ -115,12 +158,78 @@ export default function TrackingPage() {
           </button>
         </div>
 
-        <AnimatePresence>
-          {loading && <p className="text-center text-stone-500">جاري البحث...</p>}
-          {error && <p className="text-center text-red-500">{error}</p>}
+        <AnimatePresence mode="wait">
+          {loading && <p key="loading" className="text-center text-stone-500">جاري البحث...</p>}
+          {error && <p key="error" className="text-center text-red-500">{error}</p>}
           
+          {trip && (
+            <motion.div 
+              key={`trip-${trip.id}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card border-2 border-emerald-500 space-y-6"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-lg">رحلة {trip.from} ← {trip.to}</h3>
+                  <p className="text-sm text-stone-500">رقم التتبع: <span className="font-mono font-bold text-emerald-600">{trip.trackingNumber}</span></p>
+                </div>
+                <div className={`px-4 py-1 rounded-full text-xs font-bold ${
+                  trip.status === 'active' ? 'bg-emerald-100 text-emerald-600' :
+                  trip.status === 'paused' ? 'bg-amber-100 text-amber-600' :
+                  trip.status === 'completed' ? 'bg-blue-100 text-blue-600' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {trip.status === 'active' ? 'في الطريق الآن' : 
+                   trip.status === 'paused' ? 'متوقفة مؤقتاً' : 
+                   trip.status === 'completed' ? 'وصلت الوجهة' : 'مجدولة'}
+                </div>
+              </div>
+
+              {trip.status === 'active' && liveLocation ? (
+                <div className="card p-0 overflow-hidden h-96 relative">
+                  <MapContainer 
+                    center={[liveLocation.lat, liveLocation.lng]} 
+                    zoom={13} 
+                    scrollWheelZoom={false}
+                    className="h-full w-full z-0"
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[liveLocation.lat, liveLocation.lng]} icon={AujanIcon}>
+                      <Popup>
+                        <div className="text-right">
+                          <p className="font-bold">موقع الحافلة الحالي</p>
+                          <p className="text-xs text-stone-500">آخر تحديث: {new Date(liveLocation.lastUpdated).toLocaleTimeString('ar-SA')}</p>
+                        </div>
+                      </Popup>
+                    </Marker>
+                    <MapUpdater center={[liveLocation.lat, liveLocation.lng]} />
+                  </MapContainer>
+                  <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-stone-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                      <p className="text-xs font-bold text-stone-700">بث مباشر نشط</p>
+                    </div>
+                  </div>
+                </div>
+              ) : trip.status === 'active' ? (
+                <div className="bg-stone-100 p-8 rounded-2xl text-center space-y-2">
+                  <Clock size={32} className="mx-auto text-stone-400 animate-spin" />
+                  <p className="text-sm text-stone-500">بانتظار استقبال إشارة الـ GPS من الحافلة...</p>
+                </div>
+              ) : (
+                <div className="bg-stone-50 p-6 rounded-2xl text-center">
+                  <p className="text-sm text-stone-500">تتبع الموقع المباشر متاح فقط عندما تكون الرحلة "في الطريق".</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {parcel && (
             <motion.div 
+              key={`parcel-${parcel.id}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="card border-2 border-emerald-500 space-y-6"
@@ -160,70 +269,6 @@ export default function TrackingPage() {
                   </div>
                 ))}
               </div>
-            </motion.div>
-          )}
-
-          {trip && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card border-2 border-emerald-500 space-y-6"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg">رحلة {trip.from} ← {trip.to}</h3>
-                  <p className="text-sm text-stone-500">رقم التتبع: <span className="font-mono font-bold text-emerald-600">{trip.trackingNumber}</span></p>
-                </div>
-                <div className={`px-4 py-1 rounded-full text-xs font-bold ${
-                  trip.status === 'active' ? 'bg-emerald-100 text-emerald-600' :
-                  trip.status === 'paused' ? 'bg-amber-100 text-amber-600' :
-                  trip.status === 'completed' ? 'bg-blue-100 text-blue-600' : 'bg-stone-100 text-stone-600'
-                }`}>
-                  {trip.status === 'active' ? 'في الطريق الآن' : 
-                   trip.status === 'paused' ? 'متوقفة مؤقتاً' : 
-                   trip.status === 'completed' ? 'وصلت الوجهة' : 'مجدولة'}
-                </div>
-              </div>
-
-              {trip.status === 'active' && liveLocation ? (
-                <div className="card p-0 overflow-hidden h-96 relative">
-                  <MapContainer 
-                    center={[liveLocation.lat, liveLocation.lng]} 
-                    zoom={13} 
-                    scrollWheelZoom={false}
-                    className="h-full w-full z-0"
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Marker position={[liveLocation.lat, liveLocation.lng]}>
-                      <Popup>
-                        <div className="text-right">
-                          <p className="font-bold">موقع الحافلة الحالي</p>
-                          <p className="text-xs text-stone-500">آخر تحديث: {new Date(liveLocation.lastUpdated).toLocaleTimeString('ar-SA')}</p>
-                        </div>
-                      </Popup>
-                    </Marker>
-                    <MapUpdater center={[liveLocation.lat, liveLocation.lng]} />
-                  </MapContainer>
-                  <div className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-stone-100">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                      <p className="text-xs font-bold text-stone-700">بث مباشر نشط</p>
-                    </div>
-                  </div>
-                </div>
-              ) : trip.status === 'active' ? (
-                <div className="bg-stone-100 p-8 rounded-2xl text-center space-y-2">
-                  <Clock size={32} className="mx-auto text-stone-400 animate-spin" />
-                  <p className="text-sm text-stone-500">بانتظار استقبال إشارة الـ GPS من الحافلة...</p>
-                </div>
-              ) : (
-                <div className="bg-stone-50 p-6 rounded-2xl text-center">
-                  <p className="text-sm text-stone-500">تتبع الموقع المباشر متاح فقط عندما تكون الرحلة "في الطريق".</p>
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>

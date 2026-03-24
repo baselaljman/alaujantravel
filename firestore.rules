@@ -25,6 +25,8 @@ service cloud.firestore {
     //   - date: string (required, YYYY-MM-DD)
     //   - time: string (required, HH:MM)
     //   - price: number (required, positive)
+    //   - priceSAR: number (required, positive)
+    //   - priceSYP: number (required, positive)
     //   - busType: string (required, 'VIP' or 'Standard')
     //   - totalSeats: int (required, positive)
     //   - availableSeats: int (required, positive)
@@ -56,14 +58,19 @@ service cloud.firestore {
     // Collection: parcels
     // Document ID: auto-generated
     // Fields:
-    //   - senderId: string (required)
+    //   - senderName: string (required)
+    //   - senderPhone: string (required)
     //   - receiverName: string (required)
     //   - receiverPhone: string (required)
     //   - from: string (required)
     //   - to: string (required)
-    //   - status: string (required, 'pending', 'shipped', 'delivered')
+    //   - tripId: string (required)
     //   - trackingNumber: string (required)
-    //   - description: string (optional)
+    //   - note: string (optional)
+    //   - price: number (required)
+    //   - currency: string (required, 'SAR' or 'SYP')
+    //   - status: string (required, 'pending', 'shipped', 'delivered')
+    //   - createdAt: string (required, ISO date)
     //
     // Collection: locations
     // Document ID: auto-generated
@@ -73,6 +80,14 @@ service cloud.firestore {
     //   - lat: number (required)
     //   - lng: number (required)
     //   - lastUpdated: string (required, ISO date)
+    //
+    // Collection: banners
+    // Document ID: auto-generated
+    // Fields:
+    //   - imageUrl: string (required)
+    //   - link: string (optional)
+    //   - order: int (required)
+    //   - active: bool (required)
     //
     // ===============================================================
 
@@ -88,12 +103,32 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             getUserData().role == role;
+    }
+
     function isAdmin() {
-      return isAuthenticated() &&
-        (request.auth.token.email == "baselaljman@gmail.com" || 
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-         request.auth.token.email_verified == true && request.auth.token.email == "baselaljman@gmail.com");
+      return isAuthenticated() && (
+        request.auth.token.email == "baselaljman@gmail.com" || 
+        hasRole('admin')
+      );
+    }
+
+    function isStaff() {
+      return hasRole('staff');
+    }
+
+    function hasPermission(permission) {
+      return isAuthenticated() && (
+        isAdmin() || 
+        (isStaff() && 'permissions' in getUserData() && permission in getUserData().permissions)
+      );
     }
 
     function isValidEmail(email) {
@@ -132,10 +167,12 @@ service cloud.firestore {
     }
 
     function isValidTrip(data) {
-      return hasOnlyAllowedFields(['from', 'to', 'date', 'time', 'price', 'busType', 'totalSeats', 'availableSeats', 'status', 'busNumber', 'driverId', 'bookedSeats', 'trackingNumber']) &&
+      return hasOnlyAllowedFields(['from', 'to', 'date', 'time', 'price', 'priceSAR', 'priceSYP', 'busType', 'totalSeats', 'availableSeats', 'status', 'busNumber', 'driverId', 'bookedSeats', 'trackingNumber']) &&
              data.from is string && data.to is string &&
              data.date is string && data.time is string &&
-             data.price is number && data.price > 0 &&
+             data.price is number && data.price >= 0 &&
+             data.priceSAR is number && data.priceSAR >= 0 &&
+             data.priceSYP is number && data.priceSYP >= 0 &&
              data.busType in ['VIP', 'Standard'] &&
              data.totalSeats is int && data.totalSeats > 0 &&
              data.availableSeats is int && data.availableSeats >= 0 &&
@@ -161,15 +198,20 @@ service cloud.firestore {
     }
 
     function isValidParcel(data) {
-      return hasOnlyAllowedFields(['senderId', 'receiverName', 'receiverPhone', 'from', 'to', 'status', 'trackingNumber', 'description']) &&
-             data.senderId is string &&
+      return hasOnlyAllowedFields(['senderName', 'senderPhone', 'receiverName', 'receiverPhone', 'from', 'to', 'tripId', 'trackingNumber', 'note', 'price', 'currency', 'status', 'createdAt']) &&
+             data.senderName is string &&
+             data.senderPhone is string &&
              data.receiverName is string &&
              data.receiverPhone is string &&
              data.from is string &&
              data.to is string &&
-             data.status in ['pending', 'shipped', 'delivered'] &&
+             data.tripId is string &&
              data.trackingNumber is string &&
-             (!('description' in data) || data.description is string);
+             (!('note' in data) || data.note is string) &&
+             data.price is number &&
+             data.currency in ['SAR', 'SYP'] &&
+             data.status in ['pending', 'shipped', 'delivered'] &&
+             data.createdAt is string;
     }
 
     function isValidLocation(data) {
@@ -181,62 +223,71 @@ service cloud.firestore {
              data.lastUpdated is string;
     }
 
+    function isValidCity(data) {
+      return hasOnlyAllowedFields(['name', 'country']) &&
+             data.name is string && data.country is string;
+    }
+
+    function isValidCountry(data) {
+      return hasOnlyAllowedFields(['name']) &&
+             data.name is string;
+    }
+
+    function isValidBanner(data) {
+      return hasOnlyAllowedFields(['imageUrl', 'link', 'order', 'active']) &&
+             data.imageUrl is string &&
+             (!('link' in data) || data.link is string) &&
+             data.order is int &&
+             data.active is bool;
+    }
+
     // ===============================================================
     // Match Rules
     // ===============================================================
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff');
-      allow list: if isAdmin() || (isAuthenticated() && (
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff') || 
-        resource.data.email == request.auth.token.email
-      ));
+      allow get: if isOwner(userId) || isAdmin() || isStaff();
+      allow list: if isAdmin() || isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email);
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
                     (isOwner(userId) || isAdmin());
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
-                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin() || 
-                     (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' && 
-                      'permissions' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data && 
-                      'manage_users' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions));
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin() || hasPermission('manage_users'));
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.email == request.auth.token.email);
     }
 
     match /buses/{busId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' && 
-                                   'manage_buses' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions);
+      allow write: if isAdmin() || hasPermission('manage_buses');
     }
 
     match /trips/{tripId} {
       allow read: if true;
-      allow create: if (isAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' && 'manage_trips' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions)) && isValidTrip(request.resource.data);
+      allow create: if (isAdmin() || hasPermission('manage_trips')) && isValidTrip(request.resource.data);
       allow update: if (isAdmin() && isValidTrip(request.resource.data)) || 
-                    (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' && 'manage_trips' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions && isValidTrip(request.resource.data)) ||
+                    (hasPermission('manage_trips') && isValidTrip(request.resource.data)) ||
                     (isAuthenticated() && resource.data.driverId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && isValidTrip(request.resource.data)) ||
                     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availableSeats', 'bookedSeats']) &&
                      request.resource.data.availableSeats == resource.data.availableSeats - (request.resource.data.bookedSeats.size() - resource.data.get('bookedSeats', []).size()) &&
                      request.resource.data.bookedSeats.size() > resource.data.get('bookedSeats', []).size());
-      allow delete: if isAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' && 'manage_trips' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions);
+      allow delete: if isAdmin() || hasPermission('manage_trips');
     }
 
     match /bookings/{bookingId} {
-      allow get: if (isAuthenticated() && (isOwner(resource.data.userId) || isAdmin() || resource.data.passengerEmail == request.auth.token.email || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'))) || 
+      allow get: if (isAuthenticated() && (isOwner(resource.data.userId) || isAdmin() || resource.data.passengerEmail == request.auth.token.email || isStaff())) || 
                  (!isAuthenticated() && resource.data.userId == 'guest');
-      allow list: if isAuthenticated() && (isAdmin() || 
-                    (resource.data.userId == request.auth.uid || 
-                     resource.data.passengerEmail == request.auth.token.email ||
-                     (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff') ||
-                     get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.driverId == request.auth.uid));
+      allow list: if isAdmin() || isStaff() || (isAuthenticated() && (
+                    resource.data.userId == request.auth.uid || 
+                    resource.data.passengerEmail == request.auth.token.email ||
+                    get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.driverId == request.auth.uid));
       allow create: if isValidBooking(request.resource.data);
-      allow update: if (isAuthenticated() && (isOwner(resource.data.userId) || isAdmin() || resource.data.passengerEmail == request.auth.token.email || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' && 'manage_bookings' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions))) ||
+      allow update: if (isAuthenticated() && (isOwner(resource.data.userId) || isAdmin() || resource.data.passengerEmail == request.auth.token.email || hasPermission('manage_bookings'))) ||
                     (!isAuthenticated() && resource.data.userId == 'guest');
-      allow delete: if isAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' && 'manage_bookings' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions);
+      allow delete: if isAdmin() || hasPermission('manage_bookings');
     }
 
     match /parcels/{parcelId} {
       allow read: if true; // Publicly readable for tracking
-      allow write: if isAdmin() && isValidParcel(request.resource.data);
+      allow write: if (isAdmin() || isStaff()) && isValidParcel(request.resource.data);
     }
 
     match /locations/{tripId} {
@@ -244,13 +295,28 @@ service cloud.firestore {
       allow write: if (isAdmin() || (isAuthenticated() && request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.driverId)) && isValidLocation(request.resource.data);
     }
 
-    match /metadata/{docId} {
-      allow read, write: if isAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff');
+    match /cities/{cityId} {
+      allow read: if true;
+      allow write: if (isAdmin() || hasPermission('manage_cities')) && isValidCity(request.resource.data);
     }
 
-    // Default deny
+    match /countries/{countryId} {
+      allow read: if true;
+      allow write: if (isAdmin() || hasPermission('manage_cities')) && isValidCountry(request.resource.data);
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidBanner(request.resource.data);
+    }
+
+    match /metadata/{docId} {
+      allow read, write: if isAdmin() || isStaff();
+    }
+
+    // Default allow for admin
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isAdmin();
     }
   }
 }

@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, getDocs }
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { Trip, LiveLocation } from '../types';
-import { MapPin, Navigation, Power, PowerOff, Users, Play, Pause, CheckCircle, Clock } from 'lucide-react';
+import { MapPin, Navigation, Power, PowerOff, Users, Play, Pause, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { registerPlugin } from '@capacitor/core';
@@ -81,14 +81,31 @@ export default function DriverDashboard() {
   }, [user]);
 
   const fetchPassengers = async (tripId: string) => {
-    const q = query(collection(db, 'bookings'), where('tripId', '==', tripId));
-    const snap = await getDocs(q);
-    setPassengers(snap.docs.map(doc => doc.data()));
+    try {
+      const q = query(collection(db, 'bookings'), where('tripId', '==', tripId));
+      const snap = await getDocs(q);
+      setPassengers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'bookings');
+    }
   };
 
   const updateTripStatus = async (tripId: string, status: Trip['status']) => {
     try {
       await updateDoc(doc(db, 'trips', tripId), { status });
+      
+      // Update associated parcels status automatically
+      if (status === 'active' || status === 'completed') {
+        const parcelsQuery = query(collection(db, 'parcels'), where('tripId', '==', tripId));
+        const parcelsSnap = await getDocs(parcelsQuery);
+        const newParcelStatus = status === 'active' ? 'shipped' : 'delivered';
+        
+        const updatePromises = parcelsSnap.docs.map(parcelDoc => 
+          updateDoc(doc(db, 'parcels', parcelDoc.id), { status: newParcelStatus })
+        );
+        await Promise.all(updatePromises);
+      }
+
       if (status === 'active') {
         setIsBroadcasting(true);
       } else if (status === 'completed' || status === 'cancelled') {
@@ -215,6 +232,7 @@ export default function DriverDashboard() {
       <AnimatePresence>
         {showBatteryWarning && (
           <motion.div 
+            key="battery-warning"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -366,13 +384,18 @@ export default function DriverDashboard() {
           </div>
 
           <div className="card space-y-4">
-            <h3 className="font-bold flex items-center gap-2">
-              <Users size={20} className="text-emerald-600" />
-              كشف الركاب ({passengers.length})
+            <h3 className="font-bold flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <Users size={20} className="text-emerald-600" />
+                كشف الركاب ({passengers.length})
+              </div>
+              {activeTrip && (
+                <span className="text-[10px] font-mono text-emerald-500 mr-7">رقم التتبع: {activeTrip.trackingNumber}</span>
+              )}
             </h3>
             <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
-              {passengers.map((p, idx) => (
-                <div key={idx} className="flex flex-col gap-1 bg-stone-50 p-4 rounded-xl text-sm border border-stone-100">
+              {passengers.map((p: any) => (
+                <div key={p.id} className="flex flex-col gap-1 bg-stone-50 p-4 rounded-xl text-sm border border-stone-100">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-emerald-700">مقعد {p.seatNumber}</span>
                     <span className="text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">مؤكد</span>

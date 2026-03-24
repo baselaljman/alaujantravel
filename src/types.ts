@@ -28,7 +28,9 @@ export interface Trip {
   to: string;
   date: string;
   time: string;
-  price: number;
+  price: number; // For backward compatibility
+  priceSAR: number;
+  priceSYP: number;
   busType: 'VIP' | 'Standard';
   totalSeats: number;
   availableSeats: number;
@@ -55,14 +57,30 @@ export interface Booking {
 
 export interface Parcel {
   id: string;
-  senderId: string;
+  senderName: string;
+  senderPhone: string;
   receiverName: string;
   receiverPhone: string;
   from: string;
   to: string;
-  status: 'pending' | 'shipped' | 'delivered';
+  tripId: string;
   trackingNumber: string;
-  description?: string;
+  note?: string;
+  price: number;
+  currency: 'SAR' | 'SYP';
+  status: 'pending' | 'shipped' | 'delivered';
+  createdAt: string;
+}
+
+export interface Country {
+  id: string;
+  name: string;
+}
+
+export interface City {
+  id: string;
+  name: string;
+  country: string;
 }
 
 export interface LiveLocation {
@@ -71,4 +89,12 @@ export interface LiveLocation {
   lat: number;
   lng: number;
   lastUpdated: string;
+}
+
+export interface Banner {
+  id: string;
+  imageUrl: string;
+  link?: string;
+  order: number;
+  active: boolean;
 }
