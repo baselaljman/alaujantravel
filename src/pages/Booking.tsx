@@ -29,7 +29,7 @@ export default function BookingPage() {
   const [isPhoneVerified, setIsPhoneVerified] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [contactEmail, setContactEmail] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'later'>('online');
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'later'>('later');
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<Booking[]>([]);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -202,26 +202,36 @@ export default function BookingPage() {
 
   const setupRecaptcha = () => {
     try {
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-        recaptchaVerifierRef.current = null;
-      }
-      
       const container = document.getElementById('recaptcha-container');
       if (!container) return;
 
+      // If already initialized and container has content, don't re-initialize
+      if (recaptchaVerifierRef.current && container.innerHTML !== '') {
+        return;
+      }
+
+      // Clear container and reference
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {}
+        recaptchaVerifierRef.current = null;
+      }
+      container.innerHTML = '';
+
       recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
+        size: 'normal',
         callback: () => {
           console.log('Recaptcha verified');
         },
         'expired-callback': () => {
           console.log('Recaptcha expired');
-          if (recaptchaVerifierRef.current) {
-            recaptchaVerifierRef.current.clear();
-            recaptchaVerifierRef.current = null;
-          }
+          setupRecaptcha();
         }
+      });
+
+      recaptchaVerifierRef.current.render().catch(err => {
+        console.error("Error rendering reCAPTCHA:", err);
       });
     } catch (err) {
       console.error("Recaptcha setup error:", err);
@@ -230,32 +240,34 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (step === 'contact' && !isPhoneVerified) {
+      // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         setupRecaptcha();
-      }, 500);
+      }, 100);
+      
       return () => {
         clearTimeout(timer);
-        if (recaptchaVerifierRef.current) {
-          recaptchaVerifierRef.current.clear();
-          recaptchaVerifierRef.current = null;
-        }
+        // We don't necessarily want to clear it on every re-render of the component
+        // but we should clear it if we leave the contact step
       };
     }
   }, [step, isPhoneVerified]);
 
   const sendOTP = async () => {
     if (!contactPhone) return;
+    
+    // Ensure recaptcha is ready
+    if (!recaptchaVerifierRef.current) {
+      setupRecaptcha();
+    }
+
     setLoading(true);
     try {
-      if (!recaptchaVerifierRef.current) {
-        setupRecaptcha();
-      }
-      
       const phoneNumber = `${countryCode}${contactPhone.replace(/^0+/, '')}`;
       const appVerifier = recaptchaVerifierRef.current;
       
       if (!appVerifier) {
-        throw new Error("Recaptcha not initialized");
+        throw new Error("فشل تهيئة أداة التحقق. يرجى تحديث الصفحة.");
       }
 
       const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
@@ -264,14 +276,20 @@ export default function BookingPage() {
       alert('تم إرسال رمز التحقق إلى هاتفك');
     } catch (error: any) {
       console.error("OTP Error:", error);
-      if (error.code === 'auth/captcha-check-failed' || error.code === 'auth/invalid-app-credential') {
-        alert('فشل التحقق من reCAPTCHA. يرجى المحاولة مرة أخرى.');
+      
+      // If it's the "already rendered" error, we try to recover
+      if (error.message?.includes('already been rendered')) {
+        setupRecaptcha();
+        alert('حدث خطأ في أداة التحقق، يرجى المحاولة مرة أخرى.');
       } else {
         alert(`حدث خطأ أثناء إرسال الرمز: ${error.message || 'يرجى التأكد من صحة الرقم.'}`);
       }
       
+      // Reset recaptcha on error
       if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {}
         recaptchaVerifierRef.current = null;
         setupRecaptcha();
       }
@@ -483,20 +501,23 @@ export default function BookingPage() {
                     placeholder="رقم الهاتف" 
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    disabled={isPhoneVerified}
-                    className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-50"
+                    className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
-                {!otpSent && !isPhoneVerified && (
-                  <button 
-                    onClick={sendOTP}
-                    disabled={!contactPhone || loading}
-                    className="text-xs text-emerald-600 font-bold hover:underline disabled:opacity-50"
-                  >
-                    إرسال رمز التحقق (OTP)
-                  </button>
-                )}
               </div>
+
+              {/* OTP section disabled for now as per user request */}
+              {/* 
+              {!otpSent && !isPhoneVerified && (
+                <button 
+                  onClick={sendOTP}
+                  disabled={!contactPhone || loading}
+                  className="text-xs text-emerald-600 font-bold hover:underline disabled:opacity-50"
+                >
+                  إرسال رمز التحقق (OTP)
+                </button>
+              )}
+              */}
 
               {otpSent && !isPhoneVerified && (
                 <div className="space-y-2 p-4 bg-stone-50 rounded-2xl border border-stone-100">
@@ -551,7 +572,7 @@ export default function BookingPage() {
               <div className="flex justify-between"><span>المبلغ الإجمالي:</span><span className="font-black text-emerald-600">{formatPrice(getTripPrice(selectedTrip).value * selectedSeats.length)}</span></div>
             </div>
             <button 
-              disabled={!contactPhone || !isPhoneVerified}
+              disabled={!contactPhone}
               onClick={() => setStep('payment')}
               className="btn-primary w-full disabled:opacity-50"
             >
@@ -563,31 +584,11 @@ export default function BookingPage() {
         <div className="space-y-6">
           <button onClick={() => setStep('contact')} className="text-emerald-600 font-bold mb-4">← العودة لمعلومات التواصل</button>
           <div className="card max-w-md mx-auto space-y-6">
-            <h3 className="font-bold text-xl text-center">طريقة الدفع</h3>
+            <h3 className="font-bold text-xl text-center">تأكيد الحجز</h3>
             
-            <div className="grid grid-cols-2 gap-4">
-              <button 
-                onClick={() => setPaymentMethod('online')}
-                className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
-                  paymentMethod === 'online' ? 'border-emerald-500 bg-emerald-50' : 'border-stone-100 bg-stone-50'
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'online' ? 'border-emerald-500' : 'border-stone-300'}`}>
-                  {paymentMethod === 'online' && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />}
-                </div>
-                <span className="font-bold text-sm">دفع إلكتروني</span>
-              </button>
-              <button 
-                onClick={() => setPaymentMethod('later')}
-                className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
-                  paymentMethod === 'later' ? 'border-emerald-500 bg-emerald-50' : 'border-stone-100 bg-stone-50'
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'later' ? 'border-emerald-500' : 'border-stone-300'}`}>
-                  {paymentMethod === 'later' && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />}
-                </div>
-                <span className="font-bold text-sm">دفع عند السفر</span>
-              </button>
+            <div className="p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 flex flex-col items-center gap-2">
+              <CheckCircle className="text-emerald-500" size={24} />
+              <span className="font-bold text-sm">الدفع عند السفر</span>
             </div>
 
             <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex justify-between items-center">
@@ -603,62 +604,19 @@ export default function BookingPage() {
               </div>
             </div>
 
-            {paymentMethod === 'online' ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs text-stone-500">رقم البطاقة</label>
-                  <input 
-                    type="text" 
-                    placeholder="XXXX XXXX XXXX XXXX" 
-                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs text-stone-500">تاريخ الانتهاء</label>
-                    <input 
-                      type="text" 
-                      placeholder="MM/YY" 
-                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs text-stone-500">رمز الأمان CVV</label>
-                    <input 
-                      type="password" 
-                      placeholder="***" 
-                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs text-stone-500">اسم صاحب البطاقة</label>
-                  <input 
-                    type="text" 
-                    placeholder="الاسم كما هو مكتوب على البطاقة" 
-                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
-                <div className="flex items-center gap-2 text-[10px] text-stone-400 justify-center">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  اتصال آمن ومشفر 256-bit
-                </div>
-              </div>
-            ) : (
-              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 space-y-2">
-                <p className="text-sm font-bold text-amber-800">ملاحظة هامة:</p>
-                <p className="text-xs text-amber-700 leading-relaxed">
-                  عند اختيار الدفع عند السفر، يرجى الحضور إلى المكتب قبل موعد الرحلة بـ 30 دقيقة على الأقل لتأكيد الحجز ودفع الرسوم. في حال التأخر قد يتم إلغاء الحجز تلقائياً.
-                </p>
-              </div>
-            )}
+            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 space-y-2">
+              <p className="text-sm font-bold text-amber-800">ملاحظة هامة:</p>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                يرجى الحضور إلى المكتب قبل موعد الرحلة بـ 30 دقيقة على الأقل لتأكيد الحجز ودفع الرسوم. في حال التأخر قد يتم إلغاء الحجز تلقائياً.
+              </p>
+            </div>
 
             <button 
               disabled={loading}
               onClick={handleBooking}
               className="btn-primary w-full"
             >
-              {loading ? 'جاري معالجة الطلب...' : paymentMethod === 'online' ? 'تأكيد الدفع وإتمام الحجز' : 'تأكيد الحجز'}
+              {loading ? 'جاري معالجة الطلب...' : 'تأكيد الحجز'}
             </button>
           </div>
         </div>

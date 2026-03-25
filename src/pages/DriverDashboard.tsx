@@ -169,7 +169,9 @@ export default function DriverDashboard() {
                     };
                     
                     try {
-                      // Using setDoc directly in the callback
+                      // Note: Since offline persistence is disabled in firebase.ts,
+                      // this write will only succeed if the device is currently online.
+                      // It will NOT be stored to be sent later if offline.
                       await setDoc(doc(db, 'locations', currentTrip.id), locationData);
                       lastSyncTimeRef.current = now;
                       console.log(`[BG SYNC] ${new Date().toLocaleTimeString()}: ${location.latitude}, ${location.longitude}`);

@@ -560,7 +560,7 @@ export default function AdminDashboard() {
       case 'drivers': return perms.includes('manage_users');
       case 'staff': return perms.includes('manage_users');
       case 'cities': return perms.includes('manage_cities') || profile?.role === 'admin';
-      case 'banners': return profile?.role === 'admin';
+      case 'banners': return perms.includes('manage_banners') || profile?.role === 'admin';
       case 'parcels': return perms.includes('manage_parcels') || profile?.role === 'admin';
       default: return false;
     }
@@ -1269,6 +1269,8 @@ export default function AdminDashboard() {
                               <PermissionToggle user={user} permission="manage_parcels" label="الطرود" />
                               <PermissionToggle user={user} permission="manage_buses" label="الحافلات" />
                               <PermissionToggle user={user} permission="manage_users" label="المستخدمين" />
+                              <PermissionToggle user={user} permission="manage_cities" label="المدن" />
+                              <PermissionToggle user={user} permission="manage_banners" label="البنرات" />
                             </div>
                           )}
                           {user.role === 'admin' && <span className="text-xs text-emerald-600 font-bold">صلاحيات كاملة</span>}

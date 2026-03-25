@@ -258,7 +258,7 @@ export default function Home() {
             <motion.img 
               initial={{ x: 50, opacity: 0 }}
               whileInView={{ x: 0, opacity: 1 }}
-              src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/delivery-truck-svgrepo-com.svg" 
+              src="https://i.postimg.cc/8cGGpC8d/parcel.png" 
               alt="Parcel Delivery" 
               className="w-full max-w-sm mx-auto drop-shadow-2xl"
             />
