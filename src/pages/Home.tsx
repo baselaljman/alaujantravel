@@ -84,9 +84,9 @@ export default function Home() {
     : cities;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
       {/* Hero Section */}
-      <section className="relative min-h-[300px] sm:min-h-[600px] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <section className="relative aspect-[16/9] sm:aspect-auto sm:min-h-[600px] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <img 
           src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/busbanar.png?alt=media" 
           alt="Bus Banner" 
@@ -229,7 +229,7 @@ export default function Home() {
       </section>
 
       {/* Parcel Services */}
-      <section className="bg-emerald-900 rounded-3xl p-8 sm:p-12 text-white overflow-hidden relative">
+      <section className="bg-emerald-900 rounded-3xl p-6 sm:p-12 text-white overflow-hidden relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-800 rounded-full -translate-y-1/2 translate-x-1/2 opacity-50 blur-3xl" />
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div className="space-y-6">

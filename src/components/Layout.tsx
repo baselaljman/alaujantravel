@@ -31,9 +31,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans">
+    <div style={{ height: 'var(--app-height, 100%)' }} className="flex flex-col font-sans overflow-hidden">
       {/* Navbar */}
-      <nav className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between shadow-sm">
+      <nav className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between shadow-sm shrink-0">
         <Link to="/" className="flex items-center gap-2">
           <img src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" alt="Logo" className="w-10 h-10" />
           <span className="text-xl font-bold text-emerald-800 hidden sm:block">العوجان للسياحة</span>
@@ -72,7 +72,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto pb-20 sm:pb-12">
         {children}
       </main>
 

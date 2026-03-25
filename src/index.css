@@ -11,7 +11,24 @@
   }
   body {
     @apply bg-stone-50 text-stone-900;
+    /* Handle safe areas for mobile apps */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
+}
+
+/* Fix for mobile viewport height issues */
+:root {
+  --app-height: 100%;
+}
+
+html, body, #root {
+  height: var(--app-height, 100%);
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevent body scroll, let Layout handle it */
 }
 
 .glass {
@@ -24,5 +41,15 @@
 
 .card {
   @apply bg-white rounded-2xl p-6 shadow-sm border border-stone-100;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+main {
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
