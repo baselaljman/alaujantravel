@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query, where, addDoc, doc, updateDoc, getDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
@@ -32,6 +32,7 @@ export default function BookingPage() {
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'later'>('online');
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<Booking[]>([]);
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   const formatDateArabic = (dateStr: string) => {
     try {
@@ -201,20 +202,24 @@ export default function BookingPage() {
 
   const setupRecaptcha = () => {
     try {
-      if ((window as any).recaptchaVerifier) {
-        (window as any).recaptchaVerifier.clear();
-        (window as any).recaptchaVerifier = null;
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
       }
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'normal',
+      
+      const container = document.getElementById('recaptcha-container');
+      if (!container) return;
+
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
         callback: () => {
           console.log('Recaptcha verified');
         },
         'expired-callback': () => {
           console.log('Recaptcha expired');
-          if ((window as any).recaptchaVerifier) {
-            (window as any).recaptchaVerifier.clear();
-            (window as any).recaptchaVerifier = null;
+          if (recaptchaVerifierRef.current) {
+            recaptchaVerifierRef.current.clear();
+            recaptchaVerifierRef.current = null;
           }
         }
       });
@@ -223,23 +228,52 @@ export default function BookingPage() {
     }
   };
 
+  useEffect(() => {
+    if (step === 'contact' && !isPhoneVerified) {
+      const timer = setTimeout(() => {
+        setupRecaptcha();
+      }, 500);
+      return () => {
+        clearTimeout(timer);
+        if (recaptchaVerifierRef.current) {
+          recaptchaVerifierRef.current.clear();
+          recaptchaVerifierRef.current = null;
+        }
+      };
+    }
+  }, [step, isPhoneVerified]);
+
   const sendOTP = async () => {
     if (!contactPhone) return;
     setLoading(true);
     try {
-      setupRecaptcha();
+      if (!recaptchaVerifierRef.current) {
+        setupRecaptcha();
+      }
+      
       const phoneNumber = `${countryCode}${contactPhone.replace(/^0+/, '')}`;
-      const appVerifier = (window as any).recaptchaVerifier;
+      const appVerifier = recaptchaVerifierRef.current;
+      
+      if (!appVerifier) {
+        throw new Error("Recaptcha not initialized");
+      }
+
       const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
       setVerificationId(confirmationResult);
       setOtpSent(true);
       alert('تم إرسال رمز التحقق إلى هاتفك');
     } catch (error: any) {
       console.error("OTP Error:", error);
-      alert('حدث خطأ أثناء إرسال الرمز. يرجى التأكد من صحة الرقم.');
-      if ((window as any).recaptchaVerifier) {
-        (window as any).recaptchaVerifier.clear();
-        (window as any).recaptchaVerifier = null;
+      if (error.code === 'auth/captcha-check-failed' || error.code === 'auth/invalid-app-credential') {
+        alert('فشل التحقق من reCAPTCHA. يرجى المحاولة مرة أخرى.');
+      } else {
+        alert(`حدث خطأ أثناء إرسال الرمز: ${error.message || 'يرجى التأكد من صحة الرقم.'}`);
+      }
+      
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+        setupRecaptcha();
       }
     } finally {
       setLoading(false);
@@ -289,7 +323,7 @@ export default function BookingPage() {
       }
     });
     const link = document.createElement('a');
-    link.download = `ticket-${bookingSuccess?.id}.png`;
+    link.download = `ticket-${bookingSuccess[0]?.id || 'booking'}.png`;
     link.href = canvas.toDataURL();
     link.click();
   };
