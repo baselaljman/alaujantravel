@@ -36,7 +36,7 @@ html, body, #root {
 }
 
 .btn-primary {
-  @apply bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl transition-all font-medium shadow-md hover:shadow-lg active:scale-95;
+  @apply bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl transition-all font-medium shadow-md hover:shadow-lg active:scale-95;
 }
 
 .card {
@@ -46,6 +46,17 @@ html, body, #root {
 img {
   max-width: 100%;
   height: auto;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 main {

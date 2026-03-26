@@ -33,46 +33,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ height: 'var(--app-height, 100%)' }} className="flex flex-col font-sans overflow-hidden">
       {/* Navbar */}
-      <nav className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between shadow-sm shrink-0">
-        <Link to="/" className="flex items-center gap-2">
-          <img src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" alt="Logo" className="w-10 h-10" />
-          <span className="text-xl font-bold text-emerald-800 hidden sm:block">العوجان للسياحة</span>
+      <nav className="glass sticky top-0 z-50 px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between shadow-sm shrink-0 flex-nowrap">
+        <Link to="/" className="flex items-center gap-1 shrink-0">
+          <img src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" alt="Logo" className="w-7 h-7 sm:w-10 sm:h-10" />
+          <span className="text-base sm:text-xl font-bold text-emerald-800 hidden md:block">العوجان للسياحة</span>
         </Link>
 
-        <div className="flex items-center gap-3 sm:gap-8">
+        <div className="flex items-center gap-2 sm:gap-8 overflow-x-auto no-scrollbar py-1 flex-1 justify-center min-w-0 mx-2">
           {navItems.map(item => (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center gap-1 transition-colors ${
+              className={`flex flex-col items-center gap-0.5 sm:gap-1 transition-colors shrink-0 ${
                 location.pathname === item.path ? 'text-emerald-600 font-bold' : 'text-stone-500 hover:text-emerald-600'
               }`}
             >
-              <item.icon size={18} className="sm:size-5" />
-              <span className="text-[9px] sm:text-xs text-center whitespace-nowrap">{item.name}</span>
+              <item.icon size={16} className="sm:size-5" />
+              <span className="text-[8px] sm:text-xs text-center whitespace-nowrap">{item.name}</span>
             </Link>
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           {user ? (
-            <div className="flex items-center gap-2">
-              <div className="text-right hidden sm:block">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <div className="text-right hidden lg:block">
                 <p className="text-xs font-bold">{profile?.displayName}</p>
                 <p className="text-[10px] text-stone-500 uppercase">{profile?.role}</p>
               </div>
-              <button onClick={logout} className="p-2 hover:bg-stone-100 rounded-full text-stone-600 transition-colors">
-                <LogOut size={20} />
+              <button onClick={logout} className="p-1.5 sm:p-2 hover:bg-stone-100 rounded-full text-stone-600 transition-colors">
+                <LogOut size={18} className="sm:size-5" />
               </button>
             </div>
           ) : (
-            <Link to="/login" className="btn-primary py-2 px-4 text-sm">تسجيل الدخول</Link>
+            <Link to="/login" className="btn-primary py-1.5 px-3 sm:py-2 sm:px-4 text-[10px] sm:text-sm shrink-0">تسجيل الدخول</Link>
           )}
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto pb-20 sm:pb-12">
+      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto pb-20 sm:pb-12 min-h-0">
         {children}
       </main>
 

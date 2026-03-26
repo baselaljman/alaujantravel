@@ -86,7 +86,7 @@ export default function Home() {
   return (
     <div className="space-y-8 sm:space-y-12">
       {/* Hero Section */}
-      <section className="relative aspect-[16/9] sm:aspect-auto sm:min-h-[600px] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <section className="relative min-h-[500px] sm:min-h-[600px] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <img 
           src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/busbanar.png?alt=media" 
           alt="Bus Banner" 
@@ -94,11 +94,11 @@ export default function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
         
-        <div className="relative z-10 flex-1 flex flex-col justify-center items-center p-8 sm:p-12 text-white text-center">
+        <div className="relative z-10 flex-1 flex flex-col justify-center items-center p-4 sm:p-12 text-white text-center">
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl sm:text-6xl font-black mb-6 leading-tight"
+            className="text-2xl sm:text-6xl font-black mb-4 sm:mb-6 leading-tight pt-4 sm:pt-0"
           >
             سافر بأمان وراحة <br /> مع العوجان
           </motion.h1>
@@ -108,7 +108,7 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             onSubmit={handleSearch}
-            className="glass w-full max-w-4xl p-6 rounded-3xl grid grid-cols-1 md:grid-cols-4 gap-4 mt-8 text-stone-900"
+            className="glass w-full max-w-4xl p-4 sm:p-6 rounded-3xl grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4 mt-4 sm:mt-8 text-stone-900"
           >
             <div className="flex flex-col text-right gap-2">
               <label className="text-xs font-bold text-stone-500 mr-2">من</label>
@@ -130,7 +130,7 @@ export default function Home() {
                     
                     setSearch({...search, from: newFrom, to: newTo});
                   }}
-                  className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
+                  className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-2.5 sm:py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none min-h-[44px]"
                 >
                   {cities.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
@@ -144,7 +144,7 @@ export default function Home() {
                 <select 
                   value={search.to}
                   onChange={(e) => setSearch({...search, to: e.target.value})}
-                  className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
+                  className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-2.5 sm:py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none min-h-[44px]"
                 >
                   {filteredToCities.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
@@ -161,15 +161,15 @@ export default function Home() {
                   locale="ar-SA"
                   dateFormat="yyyy/MM/dd"
                   placeholderText="يوم / شهر / سنة"
-                  className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-right"
+                  className="w-full bg-stone-50 border-none rounded-xl pr-10 pl-4 py-2.5 sm:py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-right min-h-[44px]"
                   wrapperClassName="w-full"
                 />
               </div>
             </div>
 
-            <div className="flex items-end">
-              <button type="submit" className="btn-primary w-full py-3.5 flex items-center justify-center gap-2">
-                <Search size={20} />
+            <div className="flex items-end md:mt-0 mt-2">
+              <button type="submit" className="btn-primary w-full py-3 flex items-center justify-center gap-2">
+                <Search size={18} />
                 بحث عن رحلات
               </button>
             </div>
