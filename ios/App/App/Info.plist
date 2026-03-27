@@ -47,5 +47,14 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>نحتاج للوصول لموقعك لتتبع الرحلة وتزويدك بالخدمات المناسبة</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>نحتاج للوصول لموقعك لتتبع الرحلة وتزويدك بالخدمات المناسبة</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
