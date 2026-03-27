@@ -40,7 +40,7 @@ export default function AdminDashboard() {
   const [newTrip, setNewTrip] = useState<Partial<Trip>>({
     from: '', to: '', date: '', time: '', 
     busNumber: '', price: 0, priceSAR: 300, priceSYP: 1000000, busType: 'Standard', 
-    totalSeats: 45, status: 'scheduled'
+    totalSeats: 45, status: 'scheduled', tripType: 'international'
   });
   const [newBus, setNewBus] = useState<Partial<Bus>>({
     plateNumber: '', busNumber: '', model: '', 
@@ -325,9 +325,10 @@ export default function AdminDashboard() {
         availableSeats: newTrip.totalSeats,
         bookedSeats: [],
         trackingNumber,
-        driverId: selectedBus?.driverId || ''
+        driverId: selectedBus?.driverId || '',
+        tripType: newTrip.tripType || 'international'
       });
-      setNewTrip({ ...newTrip, date: '', time: '', busNumber: '', priceSAR: 300, priceSYP: 1000000 });
+      setNewTrip({ ...newTrip, date: '', time: '', busNumber: '', priceSAR: 300, priceSYP: 1000000, tripType: 'international' });
     } catch (error) {
       console.error('Error adding trip:', error);
     }
@@ -856,7 +857,20 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <select 
                     value={newTrip.from} 
-                    onChange={e => setNewTrip({...newTrip, from: e.target.value})} 
+                    onChange={e => {
+                      const newFrom = e.target.value;
+                      const fromCity = cities.find(c => c.name === newFrom);
+                      let newTo = newTrip.to;
+                      if (fromCity) {
+                        const currentToCity = cities.find(c => c.name === newTrip.to);
+                        if (currentToCity) {
+                          if (newTrip.tripType === 'international' && currentToCity.country === fromCity.country) {
+                            newTo = '';
+                          }
+                        }
+                      }
+                      setNewTrip({...newTrip, from: newFrom, to: newTo});
+                    }} 
                     className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="">من</option>
@@ -868,7 +882,18 @@ export default function AdminDashboard() {
                     className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="">إلى</option>
-                    {cities.map(c => <option key={c.id} value={c.name}>{c.name} ({c.country})</option>)}
+                    {cities
+                      .filter(c => {
+                        if (!newTrip.from) return true;
+                        const fromCity = cities.find(city => city.name === newTrip.from);
+                        if (!fromCity) return true;
+                        if (newTrip.tripType === 'umrah') {
+                          return c.name !== newTrip.from; // Same country allowed for Umrah
+                        }
+                        return c.country !== fromCity.country; // Different country for International
+                      })
+                      .map(c => <option key={c.id} value={c.name}>{c.name} ({c.country})</option>)
+                    }
                   </select>
                   <input type="date" value={newTrip.date} onChange={e => setNewTrip({...newTrip, date: e.target.value})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                   <input type="time" value={newTrip.time} onChange={e => setNewTrip({...newTrip, time: e.target.value})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
@@ -878,6 +903,25 @@ export default function AdminDashboard() {
                   </select>
                   <input type="number" placeholder="السعر (ريال)" value={newTrip.priceSAR} onChange={e => setNewTrip({...newTrip, priceSAR: Number(e.target.value)})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                   <input type="number" placeholder="السعر (ل.س)" value={newTrip.priceSYP} onChange={e => setNewTrip({...newTrip, priceSYP: Number(e.target.value)})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+                  <select 
+                    value={newTrip.tripType} 
+                    onChange={e => {
+                      const newType = e.target.value as 'international' | 'umrah';
+                      let newTo = newTrip.to;
+                      const fromCity = cities.find(c => c.name === newTrip.from);
+                      if (fromCity && newTo) {
+                        const toCity = cities.find(c => c.name === newTo);
+                        if (toCity && newType === 'international' && toCity.country === fromCity.country) {
+                          newTo = '';
+                        }
+                      }
+                      setNewTrip({...newTrip, tripType: newType, to: newTo});
+                    }} 
+                    className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="international">رحلة دولية</option>
+                    <option value="umrah">رحلة عمرة</option>
+                  </select>
                   <button onClick={handleAddTrip} className="btn-primary col-span-full">إضافة الرحلة</button>
                 </div>
               </div>
@@ -888,6 +932,7 @@ export default function AdminDashboard() {
                     <tr className="text-xs text-stone-400 uppercase">
                       <th className="p-4">رقم التتبع</th>
                       <th className="p-4">الرحلة</th>
+                      <th className="p-4">النوع</th>
                       <th className="p-4">التاريخ</th>
                       <th className="p-4">الحافلة</th>
                       <th className="p-4">السعر (ريال)</th>
@@ -902,6 +947,11 @@ export default function AdminDashboard() {
                       <tr key={trip.id} className="text-sm">
                         <td className="p-4 font-mono font-bold text-emerald-600">{trip.trackingNumber}</td>
                         <td className="p-4 font-bold">{trip.from} ← {trip.to}</td>
+                        <td className="p-4">
+                          <span className={`text-[10px] px-2 py-1 rounded-full ${trip.tripType === 'umrah' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                            {trip.tripType === 'umrah' ? 'عمرة' : 'دولية'}
+                          </span>
+                        </td>
                         <td className="p-4">{trip.date} {trip.time}</td>
                         <td className="p-4">{trip.busNumber}</td>
                         <td className="p-4 font-bold text-emerald-600">{trip.priceSAR?.toLocaleString() || trip.price?.toLocaleString()} ريال</td>

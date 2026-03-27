@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MapPin, Shield, Clock, Phone, Search, Calendar, Package } from 'lucide-react';
+import { MapPin, Shield, Clock, Phone, Search, Calendar, Package, Globe, Moon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import { arSA } from 'date-fns/locale/ar-SA';
@@ -17,7 +17,7 @@ export default function Home() {
   const [cities, setCities] = useState<City[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [currentBanner, setCurrentBanner] = useState(0);
-  const [search, setSearch] = useState({ from: '', to: '', date: '' });
+  const [search, setSearch] = useState({ from: '', to: '', date: '', tripType: 'international' });
 
   useEffect(() => {
     const bannersQuery = query(
@@ -52,9 +52,16 @@ export default function Home() {
       
       // Set default values if cities exist
       if (citiesData.length > 0) {
-        // Find two cities from different countries
         const firstCity = citiesData[0];
-        const secondCity = citiesData.find(c => c.country !== firstCity.country);
+        let secondCity;
+        
+        if (search.tripType === 'umrah') {
+          // For Umrah, prefer cities in the same country (like Saudi Arabia)
+          secondCity = citiesData.find(c => c.name !== firstCity.name && c.country === firstCity.country) || citiesData.find(c => c.name !== firstCity.name);
+        } else {
+          // For International, prefer different countries
+          secondCity = citiesData.find(c => c.country !== firstCity.country);
+        }
         
         if (firstCity && secondCity) {
           setSearch(prev => ({
@@ -63,7 +70,6 @@ export default function Home() {
             to: secondCity.name
           }));
         } else if (firstCity) {
-          // Fallback if only one country exists
           setSearch(prev => ({ ...prev, from: firstCity.name }));
         }
       }
@@ -75,12 +81,14 @@ export default function Home() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate(`/booking?from=${search.from}&to=${search.to}&date=${search.date}`);
+    navigate(`/booking?from=${search.from}&to=${search.to}&date=${search.date}&type=${search.tripType}`);
   };
 
   const fromCity = cities.find(c => c.name === search.from);
   const filteredToCities = fromCity 
-    ? cities.filter(c => c.country !== fromCity.country)
+    ? (search.tripType === 'umrah' 
+        ? cities.filter(c => c.name !== search.from) // Allow same country for Umrah, just not the same city
+        : cities.filter(c => c.country !== fromCity.country))
     : cities;
 
   return (
@@ -103,6 +111,63 @@ export default function Home() {
             سافر بأمان وراحة <br /> مع العوجان
           </motion.h1>
           
+          {/* Trip Type Toggle */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-4 mb-8"
+          >
+            <div className="flex gap-4 p-1 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20">
+              <button
+                onClick={() => {
+                  const newType = 'international';
+                  const fromCity = cities.find(c => c.name === search.from);
+                  let newTo = search.to;
+                  if (fromCity) {
+                    const currentToCity = cities.find(c => c.name === search.to);
+                    if (currentToCity && currentToCity.country === fromCity.country) {
+                      const otherCountryCities = cities.filter(c => c.country !== fromCity.country);
+                      newTo = otherCountryCities.length > 0 ? otherCountryCities[0].name : '';
+                    }
+                  }
+                  setSearch({...search, tripType: newType, to: newTo});
+                }}
+                className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all ${
+                  search.tripType === 'international' 
+                    ? 'bg-emerald-600 text-white shadow-lg scale-105' 
+                    : 'text-white/70 hover:text-white'
+                }`}
+              >
+                <Globe size={20} />
+                رحلات دولية
+              </button>
+              <button
+                onClick={() => {
+                  setSearch({...search, tripType: 'umrah'});
+                }}
+                className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all ${
+                  search.tripType === 'umrah' 
+                    ? 'bg-amber-500 text-white shadow-lg scale-105 border-2 border-amber-300' 
+                    : 'text-white/70 hover:text-white'
+                }`}
+              >
+                <Moon size={20} className={search.tripType === 'umrah' ? 'animate-pulse' : ''} />
+                رحلات عمرة
+              </button>
+            </div>
+            
+            {search.tripType === 'umrah' && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2 bg-amber-500/20 px-4 py-1.5 rounded-full border border-amber-500/30 backdrop-blur-sm"
+              >
+                <div className="w-2 h-2 bg-amber-500 rounded-full animate-ping" />
+                <span className="text-amber-400 text-xs font-bold">نظام حجز رحلات العمرة نشط</span>
+              </motion.div>
+            )}
+          </motion.div>
+
           {/* Search Form */}
           <motion.form 
             initial={{ opacity: 0, scale: 0.95 }}

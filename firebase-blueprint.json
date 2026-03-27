@@ -15,7 +15,8 @@
         "busType": { "type": "string", "enum": ["VIP", "Standard"], "description": "Type of bus" },
         "totalSeats": { "type": "integer", "description": "Total number of seats" },
         "availableSeats": { "type": "integer", "description": "Number of seats currently available" },
-        "status": { "type": "string", "enum": ["active", "cancelled", "completed"], "description": "Current status of the trip" }
+        "status": { "type": "string", "enum": ["active", "cancelled", "completed"], "description": "Current status of the trip" },
+        "tripType": { "type": "string", "enum": ["international", "umrah"], "description": "Type of trip" }
       },
       "required": ["from", "to", "date", "time", "price", "totalSeats"]
     },

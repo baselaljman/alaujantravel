@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Parcel, LiveLocation, Trip } from '../types';
-import { Package, MapPin, Search, Truck, CheckCircle, Clock } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Package, MapPin, Search, Truck, CheckCircle, Clock, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -57,17 +58,29 @@ export default function TrackingPage() {
     };
   }, []);
   const [activeTrips, setActiveTrips] = useState<Trip[]>([]);
+  const [scheduledTrips, setScheduledTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const q = query(collection(db, 'trips'), where('status', '==', 'active'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const qActive = query(collection(db, 'trips'), where('status', '==', 'active'));
+    const unsubscribeActive = onSnapshot(qActive, (snapshot) => {
       setActiveTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip)));
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'trips');
     });
-    return unsubscribe;
+
+    const qScheduled = query(collection(db, 'trips'), where('status', '==', 'scheduled'));
+    const unsubscribeScheduled = onSnapshot(qScheduled, (snapshot) => {
+      setScheduledTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'trips');
+    });
+
+    return () => {
+      unsubscribeActive();
+      unsubscribeScheduled();
+    };
   }, []);
 
   const handleTrack = async () => {
@@ -289,6 +302,53 @@ export default function TrackingPage() {
                 <p className="text-xs text-stone-400">رقم التتبع: {trip.trackingNumber}</p>
               </div>
               <div className="text-emerald-600 font-bold text-sm">تتبع</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Scheduled Trips Quick List */}
+      <section className="space-y-6">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <Clock className="text-emerald-600" />
+          الرحلات المجدولة القادمة
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {scheduledTrips.length === 0 && <p className="text-stone-500 col-span-2">لا توجد رحلات مجدولة حالياً.</p>}
+          {scheduledTrips.map(trip => (
+            <div 
+              key={trip.id} 
+              className={`card flex justify-between items-center transition-all ${
+                trip.tripType === 'umrah' 
+                  ? 'border-2 border-amber-400 bg-amber-50/30' 
+                  : 'hover:border-emerald-500'
+              }`}
+            >
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold">{trip.from} ← {trip.to}</h3>
+                  {trip.tripType === 'umrah' && (
+                    <span className="text-[10px] bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <Moon size={10} />
+                      رحلة عمرة
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-stone-500 mt-1">
+                  {new Date(trip.date).toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long' })} - {trip.time}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={`font-bold text-sm ${trip.tripType === 'umrah' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {trip.priceSAR || trip.price} ريال
+                </p>
+                <Link 
+                  to={`/booking?from=${trip.from}&to=${trip.to}&date=${trip.date}&type=${trip.tripType || 'international'}`}
+                  className="text-[10px] text-stone-400 hover:text-emerald-600 underline"
+                >
+                  حجز الآن
+                </Link>
+              </div>
             </div>
           ))}
         </div>

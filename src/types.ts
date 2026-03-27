@@ -41,6 +41,7 @@ export interface Trip {
   busNumber?: string;
   driverId?: string;
   trackingNumber?: string;
+  tripType?: 'international' | 'umrah';
 }
 
 export interface Booking {

@@ -5,7 +5,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'fi
 import { Trip, Booking, City } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCurrency } from '../hooks/useCurrency';
-import { Calendar, Users, CheckCircle, Download } from 'lucide-react';
+import { Calendar, Users, CheckCircle, Download, Globe, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 
@@ -14,7 +14,7 @@ import { useSearchParams } from 'react-router-dom';
 export default function BookingPage() {
   const { user, profile, login } = useAuth();
   const { formatPrice } = useCurrency();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
@@ -70,11 +70,13 @@ export default function BookingPage() {
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const date = searchParams.get('date');
+    const type = searchParams.get('type');
 
     let filtered = trips;
     if (from) filtered = filtered.filter(t => t.from === from);
     if (to) filtered = filtered.filter(t => t.to === to);
     if (date) filtered = filtered.filter(t => t.date === date);
+    if (type) filtered = filtered.filter(t => (t.tripType || 'international') === type);
     
     setFilteredTrips(filtered);
 
@@ -348,7 +350,61 @@ export default function BookingPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <h1 className="text-3xl font-bold text-center">حجز رحلة دولية</h1>
+      <div className="flex flex-col items-center gap-6">
+        <h1 className="text-3xl font-bold text-center">
+          {searchParams.get('type') === 'umrah' ? 'حجز رحلة عمرة' : 
+           searchParams.get('type') === 'international' ? 'حجز رحلة دولية' : 'جميع الرحلات المجدولة'}
+        </h1>
+
+        {step === 'trips' && (
+          <div className="flex gap-2 p-1 bg-stone-100 rounded-2xl border border-stone-200">
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                params.delete('type');
+                setSearchParams(params);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
+                !searchParams.get('type')
+                  ? 'bg-stone-600 text-white shadow-md'
+                  : 'text-stone-500 hover:bg-stone-200'
+              }`}
+            >
+              الكل
+            </button>
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                params.set('type', 'international');
+                setSearchParams(params);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
+                searchParams.get('type') === 'international'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-stone-500 hover:bg-stone-200'
+              }`}
+            >
+              <Globe size={18} />
+              رحلات دولية
+            </button>
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                params.set('type', 'umrah');
+                setSearchParams(params);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
+                searchParams.get('type') === 'umrah'
+                  ? 'bg-amber-500 text-white shadow-md'
+                  : 'text-stone-500 hover:bg-stone-200'
+              }`}
+            >
+              <Moon size={18} />
+              رحلات عمرة
+            </button>
+          </div>
+        )}
+      </div>
 
       {step === 'trips' ? (
         <div className="grid grid-cols-1 gap-4">
@@ -358,19 +414,28 @@ export default function BookingPage() {
               key={trip.id}
               whileHover={{ scale: 1.01 }}
               onClick={() => { setSelectedTrip(trip); setStep('seats'); }}
-              className="card cursor-pointer hover:border-emerald-500 transition-colors flex justify-between items-center"
+              className={`card cursor-pointer transition-all flex justify-between items-center ${
+                trip.tripType === 'umrah' 
+                  ? 'border-[3px] border-amber-400 hover:border-amber-500 bg-gradient-to-br from-amber-50/50 to-white shadow-amber-100 shadow-lg' 
+                  : 'hover:border-emerald-500'
+              }`}
             >
               <div className="flex gap-6 items-center">
-                <div className="bg-emerald-100 p-4 rounded-2xl text-emerald-600">
-                  <Calendar size={24} />
+                <div className={`p-4 rounded-2xl ${trip.tripType === 'umrah' ? 'bg-amber-500 text-white shadow-inner' : 'bg-emerald-100 text-emerald-600'}`}>
+                  {trip.tripType === 'umrah' ? <Moon size={24} className="fill-current" /> : <Calendar size={24} />}
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">{trip.from} ← {trip.to}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg">{trip.from} ← {trip.to}</h3>
+                    {trip.tripType === 'umrah' && (
+                      <span className="text-[10px] bg-amber-500 text-white px-3 py-1 rounded-full font-black shadow-sm uppercase tracking-wider">رحلة عمرة</span>
+                    )}
+                  </div>
                   <p className="text-sm text-stone-500">{formatDateArabic(trip.date)} - {trip.time}</p>
                 </div>
               </div>
               <div className="text-left">
-                <p className="text-emerald-600 font-black text-xl">{formatTripPrice(trip)}</p>
+                <p className={`font-black text-xl ${trip.tripType === 'umrah' ? 'text-amber-600' : 'text-emerald-600'}`}>{formatTripPrice(trip)}</p>
                 <p className="text-xs text-stone-400">حافلة رقم {trip.busNumber}</p>
               </div>
             </motion.div>
@@ -672,7 +737,9 @@ export default function BookingPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <img src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/bus-svgrepo-com-1.svg" alt="Logo" style={{ width: '48px', height: '48px' }} />
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '12px', color: '#a8a29e', margin: 0 }}>تذكرة سفر دولية</p>
+                    <p style={{ fontSize: '12px', color: '#a8a29e', margin: 0 }}>
+                      {selectedTrip?.tripType === 'umrah' ? 'تذكرة رحلة عمرة' : 'تذكرة سفر دولية'}
+                    </p>
                     <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>العوجان للسياحة</p>
                   </div>
                 </div>

@@ -6,12 +6,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { initializePushNotifications } from '../services/notificationService';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { App } from '@capacitor/app';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, profile, login, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [inAppNotification, setInAppNotification] = useState<any>(null);
+
+  // Android Back Button Handling
+  useEffect(() => {
+    const backButtonListener = App.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack) {
+        window.history.back();
+      } else {
+        // If we are at the root, do nothing (don't exit)
+        // Or we could show a toast "Press back again to exit" if we wanted to exit,
+        // but the user specifically asked NOT to exit.
+        console.log('At root, back button ignored');
+      }
+    });
+
+    return () => {
+      backButtonListener.then(l => l.remove());
+    };
+  }, []);
 
   // Initialize Push Notifications
   useEffect(() => {
@@ -82,7 +101,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ height: 'var(--app-height, 100%)' }} className="flex flex-col font-sans overflow-hidden">
       {/* Navbar */}
-      <nav className="glass sticky top-0 z-50 px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between shadow-sm shrink-0 flex-nowrap">
+      <nav 
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+        className="glass sticky top-0 z-50 px-2 sm:px-4 pb-2 sm:pb-3 flex items-center justify-between shadow-sm shrink-0 flex-nowrap"
+      >
         <Link to="/" className="flex items-center gap-1 shrink-0">
           <img src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" alt="Logo" className="w-7 h-7 sm:w-10 sm:h-10" />
           <span className="text-base sm:text-xl font-bold text-emerald-800 hidden md:block">العوجان للسياحة</span>
@@ -123,6 +145,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto pb-20 sm:pb-12 min-h-0">
         {children}
+        
+        {/* Footer inside scrollable area */}
+        <footer className="bg-stone-900 text-stone-400 py-8 px-4 text-center mt-8 rounded-t-3xl">
+          <p className="text-sm">© 2026 العوجان للسياحة والسفر - جميع الحقوق محفوظة</p>
+          <div style={{ height: 'env(safe-area-inset-bottom)' }} />
+        </footer>
       </main>
 
       {/* In-App Notification Toast */}
@@ -170,7 +198,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         href="https://wa.me/966500069261"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-6 left-6 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
+        style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+        className="fixed left-6 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
         title="تواصل معنا عبر واتساب"
       >
         <svg 
@@ -187,10 +216,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </svg>
       </a>
 
-      {/* Footer */}
-      <footer className="bg-stone-900 text-stone-400 py-8 px-4 text-center">
-        <p className="text-sm">© 2026 العوجان للسياحة والسفر - جميع الحقوق محفوظة</p>
-      </footer>
+      {/* Footer removed from here as it's now inside main */}
     </div>
   );
 }
