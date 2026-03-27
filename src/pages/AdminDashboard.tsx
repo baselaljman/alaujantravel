@@ -4,20 +4,20 @@ import {
   query, where, runTransaction, getDocs 
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel } from '../types';
+import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel, Notification } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCurrency } from '../hooks/useCurrency';
 import { 
   Plus, Trash2, Edit, Bus as BusIcon, Users, Package, 
   Calendar, Shield, UserCheck, Settings, LayoutDashboard,
   CreditCard, MapPin, Clock, AlertCircle, X, Printer, Download,
-  Image as ImageIcon, DollarSign
+  Image as ImageIcon, DollarSign, Bell, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AdminCities from './AdminCities';
 import html2canvas from 'html2canvas';
 
-type AdminTab = 'dashboard' | 'trips' | 'bookings' | 'drivers' | 'buses' | 'staff' | 'cities' | 'banners' | 'parcels';
+type AdminTab = 'dashboard' | 'trips' | 'bookings' | 'drivers' | 'buses' | 'staff' | 'cities' | 'banners' | 'parcels' | 'notifications';
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
@@ -58,6 +58,10 @@ export default function AdminDashboard() {
     from: '', to: '', tripId: '', trackingNumber: '', note: '', price: 0, 
     currency: 'SAR', status: 'pending'
   });
+  const [newNotification, setNewNotification] = useState<Partial<Notification>>({
+    title: '', body: '', type: 'all', targetId: '', deliveryMethod: 'both', imageUrl: ''
+  });
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Booking Management States
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
@@ -252,6 +256,14 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.LIST, 'parcels');
     });
 
+    const unsubNotifications = onSnapshot(collection(db, 'notifications'), (snap) => {
+      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)).sort((a, b) => 
+        new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+      ));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'notifications');
+    });
+
     setLoading(false);
     return () => {
       unsubTrips();
@@ -261,6 +273,7 @@ export default function AdminDashboard() {
       unsubCities();
       unsubBanners();
       unsubParcels();
+      unsubNotifications();
     };
   }, [profile]);
 
@@ -359,6 +372,42 @@ export default function AdminDashboard() {
       from: '', to: '', tripId: '', trackingNumber: '', note: '', price: 0, 
       currency: 'SAR', status: 'pending'
     });
+  };
+
+  const handleSendNotification = async () => {
+    if (!newNotification.title || !newNotification.body) return;
+    
+    try {
+      // Calculate stats based on target audience
+      let targetUsers = users;
+      if (newNotification.type === 'drivers') {
+        targetUsers = users.filter(u => u.role === 'driver');
+      } else if (newNotification.type === 'users') {
+        targetUsers = users.filter(u => u.role === 'user');
+      } else if (newNotification.type === 'specific') {
+        targetUsers = users.filter(u => u.uid === newNotification.targetId);
+      }
+
+      const stats = {
+        total: targetUsers.length,
+        android: targetUsers.filter(u => u.deviceType === 'android').length,
+        ios: targetUsers.filter(u => u.deviceType === 'ios').length,
+        web: targetUsers.filter(u => u.deviceType === 'web' || !u.deviceType).length
+      };
+
+      await addDoc(collection(db, 'notifications'), {
+        ...newNotification,
+        sentAt: new Date().toISOString(),
+        sentBy: profile?.uid,
+        stats
+      });
+      
+      setNewNotification({ title: '', body: '', type: 'all', targetId: '', deliveryMethod: 'both', imageUrl: '' });
+      setError('تم إرسال الإشعار بنجاح');
+      setTimeout(() => setError(null), 3000);
+    } catch (error) {
+      console.error('Error sending notification:', error);
+    }
   };
 
   const handlePrintParcelInvoice = (parcel: Parcel) => {
@@ -562,6 +611,7 @@ export default function AdminDashboard() {
       case 'cities': return perms.includes('manage_cities') || profile?.role === 'admin';
       case 'banners': return perms.includes('manage_banners') || profile?.role === 'admin';
       case 'parcels': return perms.includes('manage_parcels') || profile?.role === 'admin';
+      case 'notifications': return profile?.role === 'admin';
       default: return false;
     }
   };
@@ -593,6 +643,7 @@ export default function AdminDashboard() {
         <SidebarItem id="cities" label="إدارة المدن" icon={MapPin} />
         <SidebarItem id="banners" label="إدارة البنرات" icon={ImageIcon} />
         <SidebarItem id="parcels" label="إدارة الشحنات" icon={Package} />
+        <SidebarItem id="notifications" label="إرسال إشعارات" icon={Bell} />
         <SidebarItem id="staff" label="إدارة الموظفين" icon={Shield} />
       </aside>
 
@@ -642,6 +693,141 @@ export default function AdminDashboard() {
               </motion.div>
             </div>
           )}
+          {activeTab === 'notifications' && canSeeTab('notifications') && (
+            <motion.div key="notifications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+              <h2 className="text-2xl font-bold">إدارة الإشعارات</h2>
+              
+              <div className="card space-y-4">
+                <h3 className="font-bold text-emerald-600">إرسال إشعار جديد</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="عنوان الإشعار" 
+                      value={newNotification.title} 
+                      onChange={e => setNewNotification({...newNotification, title: e.target.value})} 
+                      className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" 
+                    />
+                    <select 
+                      value={newNotification.type} 
+                      onChange={e => setNewNotification({...newNotification, type: e.target.value as any})} 
+                      className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="all">الكل</option>
+                      <option value="drivers">السائقين فقط</option>
+                      <option value="users">المسافرين فقط</option>
+                      <option value="specific">مستخدم محدد</option>
+                    </select>
+                    <select 
+                      value={newNotification.deliveryMethod} 
+                      onChange={e => setNewNotification({...newNotification, deliveryMethod: e.target.value as any})} 
+                      className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="both">إشعار عادي + داخل التطبيق</option>
+                      <option value="push">إشعار عادي فقط (Push)</option>
+                      <option value="in-app">داخل التطبيق فقط</option>
+                    </select>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="رابط الصورة (اختياري)" 
+                      value={newNotification.imageUrl} 
+                      onChange={e => setNewNotification({...newNotification, imageUrl: e.target.value})} 
+                      className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" 
+                    />
+                    {newNotification.type === 'specific' && (
+                      <select 
+                        value={newNotification.targetId} 
+                        onChange={e => setNewNotification({...newNotification, targetId: e.target.value})} 
+                        className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">اختر المستخدم</option>
+                        {users.map(u => <option key={u.uid} value={u.uid}>{u.displayName} ({u.email})</option>)}
+                      </select>
+                    )}
+                  </div>
+                  
+                  <textarea 
+                    placeholder="نص الإشعار" 
+                    value={newNotification.body} 
+                    onChange={e => setNewNotification({...newNotification, body: e.target.value})} 
+                    className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px]"
+                  />
+                  
+                  <button 
+                    onClick={handleSendNotification} 
+                    className="btn-primary flex items-center justify-center gap-2"
+                  >
+                    <Send size={18} />
+                    إرسال الإشعار
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-bold">سجل الإشعارات المرسلة</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  {notifications.map(notif => (
+                    <div key={notif.id} className="card border-l-4 border-emerald-500">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold">{notif.title}</h4>
+                        <span className="text-[10px] text-stone-400">
+                          {new Date(notif.sentAt).toLocaleString('ar-EG')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-stone-600 mb-3">{notif.body}</p>
+                      {notif.imageUrl && (
+                        <div className="mb-3 rounded-xl overflow-hidden max-w-xs">
+                          <img src={notif.imageUrl} alt={notif.title} className="w-full h-auto" referrerPolicy="no-referrer" />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] bg-stone-100 px-2 py-1 rounded-full text-stone-500">
+                          الهدف: {
+                            notif.type === 'all' ? 'الكل' : 
+                            notif.type === 'drivers' ? 'السائقين' : 
+                            notif.type === 'users' ? 'المسافرين' : 
+                            `مستخدم محدد (${users.find(u => u.uid === notif.targetId)?.displayName || 'غير معروف'})`
+                          }
+                        </span>
+                        <span className="text-[10px] bg-emerald-50 px-2 py-1 rounded-full text-emerald-600">
+                          النوع: {
+                            notif.deliveryMethod === 'push' ? 'Push' :
+                            notif.deliveryMethod === 'in-app' ? 'داخل التطبيق' :
+                            'كلاهما'
+                          }
+                        </span>
+                        {notif.stats && (
+                          <div className="flex gap-2">
+                            <span className="text-[10px] bg-blue-50 px-2 py-1 rounded-full text-blue-600">
+                              المستلمين: {notif.stats.total}
+                            </span>
+                            <span className="text-[10px] bg-stone-100 px-2 py-1 rounded-full text-stone-500">
+                              Android: {notif.stats.android} | iOS: {notif.stats.ios} | Web: {notif.stats.web}
+                            </span>
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => handleDeleteRequest('notifications', notif.id, notif.title)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {notifications.length === 0 && (
+                    <div className="text-center py-10 text-stone-400 bg-stone-50 rounded-3xl border-2 border-dashed">
+                      لا يوجد إشعارات مرسلة بعد
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {activeTab === 'dashboard' && canSeeTab('dashboard') && (
             <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
               <h2 className="text-2xl font-bold">نظرة عامة</h2>

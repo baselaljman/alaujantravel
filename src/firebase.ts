@@ -1,15 +1,20 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, Timestamp, getDocFromServer, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, Timestamp, getDocFromServer } from 'firebase/firestore';
 // @ts-ignore
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Use initializeFirestore with experimentalForceLongPolling to fix connection issues in some environments
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId);
 
 // Offline Persistence disabled as per user request
 /*
+import { enableIndexedDbPersistence } from 'firebase/firestore';
 if (typeof window !== 'undefined') {
   enableIndexedDbPersistence(db).catch((err) => {
     if (err.code === 'failed-precondition') {
@@ -79,10 +84,17 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Test connection to Firestore
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    // Use a publicly readable path to test connection without permission issues
+    await getDocFromServer(doc(db, 'trips', 'connection-test'));
   } catch (error) {
-    if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. ");
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('unavailable') || errorMessage.includes('failed to connect')) {
+      console.error("Firestore Connection Error: Could not reach the backend. This might be a network issue or blocked WebSockets. Long polling is enabled to mitigate this.");
+    } else if (errorMessage.includes('permission-denied') || errorMessage.includes('Missing or insufficient permissions')) {
+      // This is actually a good sign for connection, just a permission issue
+      console.log("Firestore Connection: Reached backend successfully (Permission denied as expected for test path).");
+    } else {
+      console.warn("Firestore Connection Test Notice:", errorMessage);
     }
   }
 }

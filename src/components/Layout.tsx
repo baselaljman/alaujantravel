@@ -1,13 +1,62 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bus, User, MapPin, Package, LayoutDashboard, LogOut } from 'lucide-react';
+import { Bus, User, MapPin, Package, LayoutDashboard, LogOut, Bell, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { initializePushNotifications } from '../services/notificationService';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, login, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [inAppNotification, setInAppNotification] = useState<any>(null);
+
+  // Initialize Push Notifications
+  useEffect(() => {
+    if (user) {
+      initializePushNotifications().catch(err => console.log('Push init skipped:', err.message));
+    }
+  }, [user]);
+
+  // In-App Notifications Listener
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'notifications'),
+      orderBy('sentAt', 'desc'),
+      limit(1)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) return;
+      const notif = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+      
+      // Check if notification is for this user and delivery method
+      const isForMe = 
+        (notif.deliveryMethod === 'in-app' || notif.deliveryMethod === 'both' || !notif.deliveryMethod) && (
+          notif.type === 'all' || 
+          (notif.type === 'drivers' && profile?.role === 'driver') ||
+          (notif.type === 'users' && profile?.role === 'user') ||
+          (notif.type === 'specific' && notif.targetId === user.uid)
+        );
+
+      if (!isForMe) return;
+
+      // Only show if sent in the last 30 seconds (to avoid showing old ones on mount)
+      const sentAt = new Date(notif.sentAt).getTime();
+      const now = new Date().getTime();
+      if (now - sentAt < 30000) {
+        setInAppNotification(notif);
+        // Auto hide after 10 seconds
+        setTimeout(() => setInAppNotification(null), 10000);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user, profile]);
 
   // Redirect admin to dashboard on login or if on home page
   useEffect(() => {
@@ -75,6 +124,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto pb-20 sm:pb-12 min-h-0">
         {children}
       </main>
+
+      {/* In-App Notification Toast */}
+      <AnimatePresence>
+        {inAppNotification && (
+          <motion.div
+            initial={{ opacity: 0, x: 100, y: 0 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            className="fixed top-20 right-4 z-[100] w-full max-w-sm bg-white rounded-2xl shadow-2xl border-l-4 border-emerald-500 p-4"
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-100 text-emerald-600 p-2 rounded-full">
+                  <Bell size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm">{inAppNotification.title}</h4>
+                  <p className="text-xs text-stone-500 mt-1">{inAppNotification.body}</p>
+                  {inAppNotification.imageUrl && (
+                    <div className="mt-2 rounded-lg overflow-hidden max-h-32">
+                      <img 
+                        src={inAppNotification.imageUrl} 
+                        alt={inAppNotification.title} 
+                        className="w-full h-auto object-cover" 
+                        referrerPolicy="no-referrer" 
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button 
+                onClick={() => setInAppNotification(null)}
+                className="text-stone-400 hover:text-stone-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* WhatsApp Floating Button */}
       <a

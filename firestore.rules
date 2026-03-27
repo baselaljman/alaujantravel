@@ -144,13 +144,14 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'photoURL', 'createdAt', 'permissions', 'phoneNumber']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'photoURL', 'createdAt', 'permissions', 'phoneNumber', 'fcmToken']) &&
              (!('uid' in data) || data.uid is string) &&
              isValidEmail(data.email) &&
              data.displayName is string &&
              data.role in ['user', 'admin', 'driver', 'staff'] &&
              (!('photoURL' in data) || data.photoURL is string) &&
              (!('phoneNumber' in data) || data.phoneNumber is string) &&
+             (!('fcmToken' in data) || data.fcmToken is string) &&
              (!('createdAt' in data) || data.createdAt is string) &&
              (!('permissions' in data) || data.permissions is list);
     }
@@ -251,7 +252,9 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
                     (isOwner(userId) || isAdmin());
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
-                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin() || hasPermission('manage_users'));
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || 
+                     (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken'])) ||
+                     isAdmin() || hasPermission('manage_users'));
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.email == request.auth.token.email);
     }
 
@@ -312,6 +315,11 @@ service cloud.firestore {
 
     match /metadata/{docId} {
       allow read, write: if isAdmin() || isStaff();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAdmin() || isStaff();
+      allow create: if isAdmin() || isStaff();
     }
 
     // Default allow for admin

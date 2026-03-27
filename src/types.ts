@@ -7,6 +7,8 @@ export interface UserProfile {
   role: UserRole;
   photoURL?: string;
   phoneNumber?: string;
+  fcmToken?: string;
+  deviceType?: 'android' | 'ios' | 'web';
   createdAt?: string;
   permissions?: string[]; // For staff/admin customization
 }
@@ -97,4 +99,22 @@ export interface Banner {
   link?: string;
   order: number;
   active: boolean;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  type: 'all' | 'drivers' | 'users' | 'specific';
+  targetId?: string;
+  sentAt: string;
+  sentBy: string;
+  deliveryMethod?: 'push' | 'in-app' | 'both';
+  imageUrl?: string;
+  stats?: {
+    total: number;
+    android: number;
+    ios: number;
+    web: number;
+  };
 }

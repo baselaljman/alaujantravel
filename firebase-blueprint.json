@@ -48,6 +48,8 @@
         "phoneNumber": { "type": "string", "description": "Phone number" },
         "role": { "type": "string", "enum": ["user", "admin", "driver", "staff"], "description": "User role" },
         "permissions": { "type": "array", "items": { "type": "string" }, "description": "Staff permissions" },
+        "fcmToken": { "type": "string", "description": "Firebase Cloud Messaging token for push notifications" },
+        "deviceType": { "type": "string", "enum": ["android", "ios", "web"], "description": "Type of device the user is using" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Account creation date" }
       },
       "required": ["displayName", "email", "role"]
@@ -118,6 +120,31 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
       "required": ["senderName", "senderPhone", "receiverName", "receiverPhone", "from", "to", "tripId", "trackingNumber", "price", "status"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A notification sent to users",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Notification title" },
+        "body": { "type": "string", "description": "Notification body" },
+        "type": { "type": "string", "enum": ["all", "drivers", "users", "specific"], "description": "Target audience" },
+        "targetId": { "type": "string", "description": "Target user ID (if type is specific)" },
+        "deliveryMethod": { "type": "string", "enum": ["push", "in-app", "both"], "description": "How the notification was delivered" },
+        "imageUrl": { "type": "string", "description": "Optional image URL for the notification" },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "total": { "type": "integer" },
+            "android": { "type": "integer" },
+            "ios": { "type": "integer" },
+            "web": { "type": "integer" }
+          }
+        },
+        "sentAt": { "type": "string", "format": "date-time", "description": "When the notification was sent" },
+        "sentBy": { "type": "string", "description": "Admin ID who sent the notification" }
+      },
+      "required": ["title", "body", "type", "sentAt", "sentBy"]
     }
   },
   "firestore": {
@@ -156,6 +183,10 @@
     "/parcels": {
       "schema": "Parcel",
       "description": "Collection of all shipments"
+    },
+    "/notifications": {
+      "schema": "Notification",
+      "description": "History of sent notifications"
     }
   }
 }
