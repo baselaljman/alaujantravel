@@ -64,13 +64,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       if (!isForMe) return;
 
-      // Only show if sent in the last 30 seconds (to avoid showing old ones on mount)
+      // Only show if sent in the last 120 seconds (to avoid showing old ones on mount)
       const sentAt = new Date(notif.sentAt).getTime();
       const now = new Date().getTime();
-      if (now - sentAt < 30000) {
+      if (now - sentAt < 120000) {
         setInAppNotification(notif);
-        // Auto hide after 10 seconds
-        setTimeout(() => setInAppNotification(null), 10000);
+        // Auto hide after 15 seconds
+        setTimeout(() => setInAppNotification(null), 15000);
       }
     });
 

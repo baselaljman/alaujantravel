@@ -25,9 +25,11 @@ export const initializePushNotifications = async () => {
 
     // Request permission to use push notifications
     let permStatus = await PushNotifications.checkPermissions();
+    console.log('Current notification permission status:', permStatus.receive);
 
     if (permStatus.receive === 'prompt') {
       permStatus = await PushNotifications.requestPermissions();
+      console.log('Permission request result:', permStatus.receive);
     }
 
     if (permStatus.receive !== 'granted') {
@@ -36,11 +38,19 @@ export const initializePushNotifications = async () => {
     }
 
     // On success, we should be able to receive notifications
-    await PushNotifications.register();
+    console.log('Registering for push notifications...');
+    try {
+      await PushNotifications.register();
+      console.log('Push registration call completed.');
+    } catch (regErr) {
+      console.error('Error during PushNotifications.register():', regErr);
+    }
 
     // Listen for registration success
     PushNotifications.addListener('registration', (token) => {
-      console.log('Push registration success, token: ' + token.value);
+      console.log('Push registration success! Token:', token.value);
+      // Store token in window for easy debugging in console
+      (window as any).fcmToken = token.value;
       saveTokenToFirestore(token.value);
     });
 

@@ -16,6 +16,9 @@ const config: CapacitorConfig = {
   plugins: {
     Geolocation: {
       // Configuration for Geolocation plugin
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"]
     }
   }
 };

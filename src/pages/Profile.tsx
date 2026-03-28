@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, or } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { Booking, Trip } from '../types';
-import { Calendar, Download, MapPin, Ticket, User, Loader2 } from 'lucide-react';
+import { Calendar, Download, MapPin, Ticket, User, Loader2, Bell, RefreshCw, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import html2canvas from 'html2canvas';
 
@@ -123,6 +123,43 @@ export default function Profile() {
     return unsubscribe;
   }, []);
 
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const handleTestPush = async () => {
+    const token = (window as any).fcmToken || profile?.fcmToken;
+    if (!token) {
+      setTestResult('لم يتم العثور على رمز FCM. تأكد من منح الأذونات.');
+      return;
+    }
+
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const response = await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokens: [token],
+          title: 'اختبار الإشعارات',
+          body: 'هذا إشعار تجريبي من حسابك الشخصي.',
+          data: { type: 'test' }
+        })
+      });
+
+      if (response.ok) {
+        setTestResult('تم إرسال طلب الإشعار بنجاح! انتظر وصوله.');
+      } else {
+        const err = await response.json();
+        setTestResult(`فشل الإرسال: ${err.error}`);
+      }
+    } catch (e: any) {
+      setTestResult(`خطأ: ${e.message}`);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
@@ -141,6 +178,54 @@ export default function Profile() {
         <div>
           <h1 className="text-2xl font-bold">{profile?.displayName || 'مستخدم'}</h1>
           <p className="text-stone-500 text-sm">{user.email}</p>
+        </div>
+      </div>
+
+      {/* Notification Debug Section */}
+      <div className="card bg-stone-50 border-stone-200">
+        <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+          <Bell className="text-emerald-600" size={20} />
+          إعدادات الإشعارات
+        </h2>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold">حالة الإشعارات</p>
+              <p className="text-xs text-stone-500">
+                {profile?.fcmToken ? 'مسجل بنجاح' : 'غير مسجل (تأكد من منح الأذونات)'}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => window.location.reload()}
+                className="btn-secondary py-2 px-4 text-xs flex items-center gap-2"
+              >
+                <RefreshCw size={14} />
+                تحديث الحالة
+              </button>
+              <button 
+                onClick={handleTestPush}
+                disabled={testLoading || !profile?.fcmToken}
+                className="btn-primary py-2 px-4 text-xs flex items-center gap-2"
+              >
+                {testLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                إرسال إشعار تجريبي
+              </button>
+            </div>
+          </div>
+          
+          {testResult && (
+            <div className={`p-3 rounded-xl text-xs ${testResult.includes('بنجاح') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+              {testResult}
+            </div>
+          )}
+
+          {profile?.fcmToken && (
+            <div className="bg-stone-100 p-3 rounded-xl">
+              <p className="text-[10px] text-stone-400 uppercase mb-1">FCM Token (للمطورين)</p>
+              <p className="text-[10px] font-mono break-all text-stone-600">{profile.fcmToken}</p>
+            </div>
+          )}
         </div>
       </div>
 
