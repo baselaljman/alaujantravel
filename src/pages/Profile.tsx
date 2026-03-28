@@ -3,9 +3,12 @@ import { collection, query, where, onSnapshot, or } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { Booking, Trip } from '../types';
-import { Calendar, Download, MapPin, Ticket, User, Loader2, Bell, RefreshCw, Send } from 'lucide-react';
+import { Calendar, Download, MapPin, Ticket, User, Loader2, Bell, RefreshCw, Send, Share as ShareIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import html2canvas from 'html2canvas';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 export default function Profile() {
   const { user, profile } = useAuth();
@@ -61,10 +64,41 @@ export default function Profile() {
               clonedDoc.head.appendChild(style);
             }
           });
-          const link = document.createElement('a');
-          link.download = `ticket-${booking.id.slice(0, 8)}.png`;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
+
+          const dataUrl = canvas.toDataURL('image/png');
+          const fileName = `ticket-${booking.id.slice(0, 8)}.png`;
+
+          if (Capacitor.isNativePlatform()) {
+            try {
+              // Save to device filesystem
+              const savedFile = await Filesystem.writeFile({
+                path: fileName,
+                data: dataUrl,
+                directory: Directory.Cache
+              });
+
+              // Share the file (allows saving to gallery or sending via WhatsApp)
+              await Share.share({
+                title: 'تذكرة العوجان للسياحة',
+                text: 'إليك تذكرة سفرك من العوجان للسياحة',
+                url: savedFile.uri,
+                dialogTitle: 'حفظ أو مشاركة التذكرة'
+              });
+            } catch (nativeErr) {
+              console.error('Error in native save/share:', nativeErr);
+              // Fallback to web download if native fails
+              const link = document.createElement('a');
+              link.download = fileName;
+              link.href = dataUrl;
+              link.click();
+            }
+          } else {
+            // Web download
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataUrl;
+            link.click();
+          }
         }
       } catch (error) {
         console.error('Error generating ticket:', error);
