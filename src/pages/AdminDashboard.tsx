@@ -278,6 +278,15 @@ export default function AdminDashboard() {
   }, [profile]);
 
   // Handlers
+  const [notificationStatus, setNotificationStatus] = useState<{ initialized: boolean, projectId: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/notification-status')
+      .then(res => res.json())
+      .then(data => setNotificationStatus(data))
+      .catch(err => console.error('Error fetching notification status:', err));
+  }, []);
+
   const handleUpdateTripStatus = async (tripId: string, status: string) => {
     try {
       await updateDoc(doc(db, 'trips', tripId), { status });
@@ -396,18 +405,52 @@ export default function AdminDashboard() {
         web: targetUsers.filter(u => u.deviceType === 'web' || !u.deviceType).length
       };
 
+      // 1. Save to Firestore (for in-app history)
       await addDoc(collection(db, 'notifications'), {
         ...newNotification,
         sentAt: new Date().toISOString(),
         sentBy: profile?.uid,
         stats
       });
+
+      // 2. Send Push Notification via Backend API if requested
+      if (newNotification.deliveryMethod === 'push' || newNotification.deliveryMethod === 'both') {
+        const tokens = targetUsers
+          .map(u => u.fcmToken)
+          .filter(token => !!token) as string[];
+
+        if (tokens.length > 0) {
+          const response = await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokens,
+              title: newNotification.title,
+              body: newNotification.body,
+              imageUrl: newNotification.imageUrl,
+              data: {
+                type: 'admin_broadcast',
+                sentAt: new Date().toISOString()
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Failed to send push notification');
+          }
+          
+          const result = await response.json();
+          console.log('Push notification result:', result);
+        }
+      }
       
       setNewNotification({ title: '', body: '', type: 'all', targetId: '', deliveryMethod: 'both', imageUrl: '' });
       setError('تم إرسال الإشعار بنجاح');
       setTimeout(() => setError(null), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending notification:', error);
+      setError(`خطأ في إرسال الإشعار: ${error.message}`);
     }
   };
 
@@ -696,7 +739,28 @@ export default function AdminDashboard() {
           )}
           {activeTab === 'notifications' && canSeeTab('notifications') && (
             <motion.div key="notifications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
-              <h2 className="text-2xl font-bold">إدارة الإشعارات</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">إدارة الإشعارات</h2>
+                {notificationStatus && (
+                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${notificationStatus.initialized ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                    <div className={`w-2 h-2 rounded-full ${notificationStatus.initialized ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+                    {notificationStatus.initialized ? 'خدمة الإشعارات (FCM) مفعلة' : 'خدمة الإشعارات (FCM) تتطلب إعداد ملف الخدمة'}
+                  </div>
+                )}
+              </div>
+              
+              {!notificationStatus?.initialized && (
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl text-amber-800 text-xs space-y-2">
+                  <p className="font-bold">تنبيه: خدمة الإشعارات (Push) غير مكتملة الإعداد</p>
+                  <p>لإرسال إشعارات حقيقية للهواتف، يجب توفير ملف "Service Account" من Firebase Console.</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>اذهب إلى Firebase Console {'>'} Project Settings {'>'} Service Accounts</li>
+                    <li>قم بإنشاء مفتاح جديد (Generate new private key)</li>
+                    <li>قم بتسمية الملف <code>service-account.json</code> ووضعه في المجلد الرئيسي للتطبيق</li>
+                    <li>أو قم بإضافته كمتغير بيئة باسم <code>FIREBASE_SERVICE_ACCOUNT</code></li>
+                  </ul>
+                </div>
+              )}
               
               <div className="card space-y-4">
                 <h3 className="font-bold text-emerald-600">إرسال إشعار جديد</h3>

@@ -8,43 +8,61 @@ export const initializePushNotifications = async () => {
     return;
   }
 
-  // Request permission to use push notifications
-  // iOS will prompt a user for permission out of the box.
-  // Android will just return 'granted' if the app has the permission in its manifest.
-  let permStatus = await PushNotifications.checkPermissions();
+  try {
+    // Create a default notification channel for Android (required for Android 8+)
+    if (Capacitor.getPlatform() === 'android') {
+      await PushNotifications.createChannel({
+        id: 'default',
+        name: 'Default Channel',
+        description: 'Default channel for all notifications',
+        importance: 5, // High importance
+        visibility: 1, // Public
+        vibration: true,
+        sound: 'default'
+      });
+      console.log('Notification channel created for Android.');
+    }
 
-  if (permStatus.receive === 'prompt') {
-    permStatus = await PushNotifications.requestPermissions();
+    // Request permission to use push notifications
+    let permStatus = await PushNotifications.checkPermissions();
+
+    if (permStatus.receive === 'prompt') {
+      permStatus = await PushNotifications.requestPermissions();
+    }
+
+    if (permStatus.receive !== 'granted') {
+      console.warn('User denied push notification permissions!');
+      return;
+    }
+
+    // On success, we should be able to receive notifications
+    await PushNotifications.register();
+
+    // Listen for registration success
+    PushNotifications.addListener('registration', (token) => {
+      console.log('Push registration success, token: ' + token.value);
+      saveTokenToFirestore(token.value);
+    });
+
+    // Listen for registration error
+    PushNotifications.addListener('registrationError', (error) => {
+      console.error('Error on registration: ' + JSON.stringify(error));
+    });
+
+    // Handle received notifications while app is open
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('Push received: ' + JSON.stringify(notification));
+      // You could trigger an in-app toast here if needed
+    });
+
+    // Handle notification action (tapping on it)
+    PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+      console.log('Push action performed: ' + JSON.stringify(notification));
+    });
+
+  } catch (error) {
+    console.error('Failed to initialize push notifications:', error);
   }
-
-  if (permStatus.receive !== 'granted') {
-    throw new Error('User denied permissions!');
-  }
-
-  // On success, we should be able to receive notifications
-  await PushNotifications.register();
-
-  // Some issue with our setup and push will cause addListener('registrationError')
-  // to fire
-  PushNotifications.addListener('registration', (token) => {
-    console.log('Push registration success, token: ' + token.value);
-    saveTokenToFirestore(token.value);
-  });
-
-  PushNotifications.addListener('registrationError', (error) => {
-    console.error('Error on registration: ' + JSON.stringify(error));
-  });
-
-  // Show us the notification payload if the app is open on our device
-  PushNotifications.addListener('pushNotificationReceived', (notification) => {
-    console.log('Push received: ' + JSON.stringify(notification));
-    // You could trigger an in-app toast here
-  });
-
-  // Method called when tapping on a notification
-  PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-    console.log('Push action performed: ' + JSON.stringify(notification));
-  });
 };
 
 const saveTokenToFirestore = async (token: string) => {
