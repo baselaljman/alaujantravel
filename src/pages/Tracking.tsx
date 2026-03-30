@@ -65,14 +65,18 @@ export default function TrackingPage() {
   useEffect(() => {
     const qActive = query(collection(db, 'trips'), where('status', '==', 'active'));
     const unsubscribeActive = onSnapshot(qActive, (snapshot) => {
-      setActiveTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip)));
+      const trips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
+      trips.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+      setActiveTrips(trips);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'trips');
     });
 
     const qScheduled = query(collection(db, 'trips'), where('status', '==', 'scheduled'));
     const unsubscribeScheduled = onSnapshot(qScheduled, (snapshot) => {
-      setScheduledTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip)));
+      const trips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
+      trips.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+      setScheduledTrips(trips);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'trips');
     });
@@ -82,6 +86,29 @@ export default function TrackingPage() {
       unsubscribeScheduled();
     };
   }, []);
+
+  const flattenedScheduledTrips = React.useMemo(() => {
+    const result: Trip[] = [];
+    scheduledTrips.forEach(trip => {
+      // Add intermediate stops as independent trips
+      if (trip.stops && Array.isArray(trip.stops) && trip.stops.length > 0) {
+        trip.stops.forEach((stop, index) => {
+          result.push({
+            ...trip,
+            id: `${trip.id}-stop-${index}`,
+            to: stop.cityName,
+            priceSAR: stop.priceSAR,
+            priceSYP: stop.priceSYP,
+            isStop: true,
+            originalTripId: trip.id
+          } as Trip);
+        });
+      }
+      // Add the main destination
+      result.push(trip);
+    });
+    return result;
+  }, [scheduledTrips]);
 
   const handleTrack = async () => {
     if (!trackingNumber.trim()) return;
@@ -99,15 +126,26 @@ export default function TrackingPage() {
     try {
       // Search in both collections simultaneously
       const [parcelSnap, tripSnap] = await Promise.all([
-        getDocs(query(collection(db, 'parcels'), where('trackingNumber', '==', trackingNumber.trim()))),
+        getDocs(query(collection(db, 'parcels'), 
+          where('waybillNumber', '==', trackingNumber.trim())
+        )),
         getDocs(query(collection(db, 'trips'), where('trackingNumber', '==', trackingNumber.trim())))
       ]);
+
+      // If no parcel found by waybillNumber, try searching by trip trackingNumber
+      let parcelDocs = parcelSnap.docs;
+      if (parcelSnap.empty) {
+        const parcelByTripSnap = await getDocs(query(collection(db, 'parcels'), 
+          where('trackingNumber', '==', trackingNumber.trim())
+        ));
+        parcelDocs = parcelByTripSnap.docs;
+      }
       
       let foundParcel: Parcel | null = null;
       let foundTrip: Trip | null = null;
 
-      if (!parcelSnap.empty) {
-        foundParcel = { id: parcelSnap.docs[0].id, ...parcelSnap.docs[0].data() } as Parcel;
+      if (parcelDocs.length > 0) {
+        foundParcel = { id: parcelDocs[0].id, ...parcelDocs[0].data() } as Parcel;
         setParcel(foundParcel);
       }
 
@@ -162,7 +200,7 @@ export default function TrackingPage() {
             type="text"
             value={trackingNumber}
             onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder="أدخل رقم تتبع الرحلة (wa001) أو الطرد (AWJ-1234)"
+            placeholder="أدخل رقم تتبع الرحلة (wa001) أو رقم بوليصة الشحن (00001)"
             className="flex-1 bg-stone-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
           <button onClick={handleTrack} className="btn-primary flex items-center gap-2">
@@ -250,7 +288,7 @@ export default function TrackingPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-lg">طرد من {parcel.from} إلى {parcel.to}</h3>
-                  <p className="text-sm text-stone-500">رقم التتبع: {parcel.trackingNumber}</p>
+                  <p className="text-sm text-stone-500">رقم بوليصة الشحن: {parcel.waybillNumber}</p>
                 </div>
                 <div className={`px-4 py-1 rounded-full text-xs font-bold ${
                   parcel.status === 'delivered' ? 'bg-emerald-100 text-emerald-600' :
@@ -314,8 +352,8 @@ export default function TrackingPage() {
           الرحلات المجدولة القادمة
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {scheduledTrips.length === 0 && <p className="text-stone-500 col-span-2">لا توجد رحلات مجدولة حالياً.</p>}
-          {scheduledTrips.map(trip => (
+          {flattenedScheduledTrips.length === 0 && <p className="text-stone-500 col-span-2">لا توجد رحلات مجدولة حالياً.</p>}
+          {flattenedScheduledTrips.map(trip => (
             <div 
               key={trip.id} 
               className={`card flex justify-between items-center transition-all ${

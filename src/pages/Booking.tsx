@@ -72,7 +72,29 @@ export default function BookingPage() {
     const date = searchParams.get('date');
     const type = searchParams.get('type');
 
-    let filtered = trips;
+    let expandedTrips: Trip[] = [];
+    
+    trips.forEach(trip => {
+      // Add the main trip
+      expandedTrips.push(trip);
+      
+      // Add virtual trips for each stop
+      if ((trip.tripType || 'international') === 'international' && trip.stops && trip.stops.length > 0) {
+        trip.stops.forEach(stop => {
+          expandedTrips.push({
+            ...trip,
+            id: `${trip.id}-stop-${stop.cityName}`,
+            to: stop.cityName,
+            priceSAR: stop.priceSAR,
+            priceSYP: stop.priceSYP,
+            isStop: true,
+            originalTripId: trip.id
+          });
+        });
+      }
+    });
+
+    let filtered = expandedTrips;
     if (from) filtered = filtered.filter(t => t.from === from);
     if (to) filtered = filtered.filter(t => t.to === to);
     if (date) filtered = filtered.filter(t => t.date === date);
@@ -82,7 +104,7 @@ export default function BookingPage() {
 
     // Update selectedTrip if it's in the new list
     if (selectedTrip) {
-      const updated = trips.find(t => t.id === selectedTrip.id);
+      const updated = expandedTrips.find(t => t.id === selectedTrip.id);
       if (updated) setSelectedTrip(updated);
     }
   }, [trips, searchParams]);
@@ -112,8 +134,9 @@ export default function BookingPage() {
     if (!selectedTrip || selectedSeats.length === 0) return;
     setLoading(true);
     try {
+      const actualTripId = selectedTrip.originalTripId || selectedTrip.id;
       // Final check for seat availability right before booking
-      const tripSnap = await getDoc(doc(db, 'trips', selectedTrip.id));
+      const tripSnap = await getDoc(doc(db, 'trips', actualTripId));
       if (!tripSnap.exists()) throw new Error('الرحلة غير موجودة');
       const latestBookedSeats = tripSnap.data().bookedSeats || [];
       const conflict = selectedSeats.filter(s => latestBookedSeats.includes(s));
@@ -127,11 +150,13 @@ export default function BookingPage() {
       }
 
       const bookings: Booking[] = [];
-      const tripRef = doc(db, 'trips', selectedTrip.id);
+      const tripRef = doc(db, 'trips', actualTripId);
 
       for (let i = 0; i < selectedSeats.length; i++) {
         const bookingData: any = {
-          tripId: selectedTrip.id,
+          tripId: actualTripId,
+          from: selectedTrip.from,
+          to: selectedTrip.to,
           seatNumber: selectedSeats[i],
           status: paymentMethod === 'online' ? 'confirmed' : 'pending',
           paymentMethod: paymentMethod,
@@ -756,11 +781,11 @@ export default function BookingPage() {
                     <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الهاتف</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.passengerPhone}</p></div>
                   </div>
                   <div style={{ backgroundColor: '#ecfdf5', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>من</p><p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{selectedTrip?.from}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>من</p><p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{booking.from || selectedTrip?.from}</p></div>
                     <div style={{ color: '#6ee7b7' }}>←</div>
                     <div style={{ textAlign: 'left' }}>
                       <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>إلى</p>
-                      <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{selectedTrip?.to}</p>
+                      <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{booking.to || selectedTrip?.to}</p>
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>

@@ -42,6 +42,21 @@ export interface Trip {
   driverId?: string;
   trackingNumber?: string;
   tripType?: 'international' | 'umrah';
+  stops?: TripStop[];
+  originalTripId?: string; // For virtual trips (stops)
+  isStop?: boolean; // For virtual trips
+}
+
+export interface TripStop {
+  cityName: string;
+  priceSAR: number;
+  priceSYP: number;
+}
+
+export interface TripStopSelection {
+  cityName: string;
+  priceSAR: number;
+  priceSYP: number;
 }
 
 export interface Booking {
@@ -56,6 +71,8 @@ export interface Booking {
   paymentMethod: 'online' | 'later';
   bookingDate: string;
   status: 'confirmed' | 'pending' | 'cancelled';
+  from?: string;
+  to?: string;
 }
 
 export interface Parcel {
@@ -67,7 +84,8 @@ export interface Parcel {
   from: string;
   to: string;
   tripId: string;
-  trackingNumber: string;
+  waybillNumber: string;
+  trackingNumber?: string;
   note?: string;
   price: number;
   currency: 'SAR' | 'SYP';

@@ -4,13 +4,13 @@ import {
   query, where, runTransaction, getDocs 
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel, Notification } from '../types';
+import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel, Notification, TripStop } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCurrency } from '../hooks/useCurrency';
 import { 
   Plus, Trash2, Edit, Bus as BusIcon, Users, Package, 
   Calendar, Shield, UserCheck, Settings, LayoutDashboard,
-  CreditCard, MapPin, Clock, AlertCircle, X, Printer, Download,
+  CreditCard, MapPin, Clock, AlertCircle, X, Printer, Download, Search,
   Image as ImageIcon, DollarSign, Bell, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,8 +40,10 @@ export default function AdminDashboard() {
   const [newTrip, setNewTrip] = useState<Partial<Trip>>({
     from: '', to: '', date: '', time: '', 
     busNumber: '', price: 0, priceSAR: 300, priceSYP: 1000000, busType: 'Standard', 
-    totalSeats: 45, status: 'scheduled', tripType: 'international'
+    totalSeats: 45, status: 'scheduled', tripType: 'international',
+    stops: []
   });
+  const [newStop, setNewStop] = useState<TripStop>({ cityName: '', priceSAR: 0, priceSYP: 0 });
   const [newBus, setNewBus] = useState<Partial<Bus>>({
     plateNumber: '', busNumber: '', model: '', 
     capacity: 45, type: 'Standard', status: 'active',
@@ -55,9 +57,10 @@ export default function AdminDashboard() {
   });
   const [newParcel, setNewParcel] = useState<Partial<Parcel>>({
     senderName: '', senderPhone: '', receiverName: '', receiverPhone: '',
-    from: '', to: '', tripId: '', trackingNumber: '', note: '', price: 0, 
+    from: '', to: '', tripId: '', waybillNumber: '', note: '', price: 0, 
     currency: 'SAR', status: 'pending'
   });
+  const [parcelSearch, setParcelSearch] = useState('');
   const [newNotification, setNewNotification] = useState<Partial<Notification>>({
     title: '', body: '', type: 'all', targetId: '', deliveryMethod: 'both', imageUrl: ''
   });
@@ -172,6 +175,7 @@ export default function AdminDashboard() {
                 <th>رقم الهاتف</th>
                 <th>رقم الجواز</th>
                 <th>المقعد</th>
+                <th>الوجهة</th>
                 <th>الحالة</th>
               </tr>
             </thead>
@@ -183,6 +187,7 @@ export default function AdminDashboard() {
                   <td>${b.passengerPhone}</td>
                   <td>${b.passportNumber || '---'}</td>
                   <td>${b.seatNumber}</td>
+                  <td>${b.to || trip.to}</td>
                   <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
                 </tr>
               `).join('')}
@@ -335,9 +340,10 @@ export default function AdminDashboard() {
         bookedSeats: [],
         trackingNumber,
         driverId: selectedBus?.driverId || '',
-        tripType: newTrip.tripType || 'international'
+        tripType: newTrip.tripType || 'international',
+        stops: newTrip.stops || []
       });
-      setNewTrip({ ...newTrip, date: '', time: '', busNumber: '', priceSAR: 300, priceSYP: 1000000, tripType: 'international' });
+      setNewTrip({ ...newTrip, date: '', time: '', busNumber: '', priceSAR: 300, priceSYP: 1000000, tripType: 'international', stops: [] });
     } catch (error) {
       console.error('Error adding trip:', error);
     }
@@ -369,19 +375,40 @@ export default function AdminDashboard() {
     const selectedTrip = trips.find(t => t.id === newParcel.tripId);
     if (!selectedTrip) return;
 
-    await addDoc(collection(db, 'parcels'), {
-      ...newParcel,
-      trackingNumber: selectedTrip.trackingNumber,
-      from: selectedTrip.from,
-      to: selectedTrip.to,
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    });
-    setNewParcel({
-      senderName: '', senderPhone: '', receiverName: '', receiverPhone: '',
-      from: '', to: '', tripId: '', trackingNumber: '', note: '', price: 0, 
-      currency: 'SAR', status: 'pending'
-    });
+    try {
+      let waybillNumber = '00001';
+      
+      await runTransaction(db, async (transaction) => {
+        const counterRef = doc(db, 'metadata', 'parcel_counter');
+        const counterSnap = await transaction.get(counterRef);
+        
+        let nextCount = 1;
+        if (counterSnap.exists()) {
+          nextCount = (counterSnap.data().count || 0) + 1;
+        }
+        
+        transaction.set(counterRef, { count: nextCount });
+        waybillNumber = String(nextCount).padStart(5, '0');
+      });
+
+      await addDoc(collection(db, 'parcels'), {
+        ...newParcel,
+        waybillNumber,
+        trackingNumber: selectedTrip.trackingNumber,
+        from: selectedTrip.from,
+        to: selectedTrip.to,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      setNewParcel({
+        senderName: '', senderPhone: '', receiverName: '', receiverPhone: '',
+        from: '', to: '', tripId: '', waybillNumber: '', note: '', price: 0, 
+        currency: 'SAR', status: 'pending'
+      });
+    } catch (error) {
+      console.error('Error adding parcel:', error);
+      setError('حدث خطأ أثناء إنشاء الشحنة');
+    }
   };
 
   const handleSendNotification = async () => {
@@ -455,13 +482,14 @@ export default function AdminDashboard() {
   };
 
   const handlePrintParcelInvoice = (parcel: Parcel) => {
+    const trip = trips.find(t => t.id === parcel.tripId);
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
     const html = `
       <html dir="rtl">
         <head>
-          <title>فاتورة شحن طرد - ${parcel.trackingNumber}</title>
+          <title>فاتورة شحن طرد - ${parcel.waybillNumber}</title>
           <style>
             body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; }
             .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, .15); font-size: 16px; line-height: 24px; }
@@ -485,7 +513,8 @@ export default function AdminDashboard() {
                 <p>خدمات شحن الطرود</p>
               </div>
               <div class="tracking">
-                <p><strong>رقم التتبع:</strong> ${parcel.trackingNumber}</p>
+                <p><strong>رقم بوليصة الشحن:</strong> ${parcel.waybillNumber}</p>
+                <p><strong>رقم تتبع الرحلة:</strong> <span style="color: #059669; font-weight: bold;">${trip?.trackingNumber || '---'}</span></p>
                 <p><strong>التاريخ:</strong> ${new Date(parcel.createdAt).toLocaleDateString('ar-EG')}</p>
               </div>
             </div>
@@ -986,6 +1015,69 @@ export default function AdminDashboard() {
                     <option value="international">رحلة دولية</option>
                     <option value="umrah">رحلة عمرة</option>
                   </select>
+
+                  {newTrip.tripType === 'international' && (
+                    <div className="col-span-full space-y-4 p-4 bg-stone-50 rounded-2xl border border-stone-200">
+                      <h4 className="font-bold text-sm text-stone-600">المدن التي تمر بها الحافلة (محطات التوقف)</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <select 
+                          value={newStop.cityName} 
+                          onChange={e => setNewStop({...newStop, cityName: e.target.value})}
+                          className="bg-white p-3 rounded-xl text-sm outline-none border border-stone-200"
+                        >
+                          <option value="">اختر المدينة...</option>
+                          {cities.filter(c => c.name !== newTrip.from && c.name !== newTrip.to).map(c => (
+                            <option key={c.id} value={c.name}>{c.name} ({c.country})</option>
+                          ))}
+                        </select>
+                        <input 
+                          type="number" 
+                          placeholder="السعر (ريال)" 
+                          value={newStop.priceSAR || ''} 
+                          onChange={e => setNewStop({...newStop, priceSAR: Number(e.target.value)})}
+                          className="bg-white p-3 rounded-xl text-sm outline-none border border-stone-200"
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="السعر (ل.س)" 
+                          value={newStop.priceSYP || ''} 
+                          onChange={e => setNewStop({...newStop, priceSYP: Number(e.target.value)})}
+                          className="bg-white p-3 rounded-xl text-sm outline-none border border-stone-200"
+                        />
+                        <button 
+                          onClick={() => {
+                            if (!newStop.cityName || !newStop.priceSAR || !newStop.priceSYP) return;
+                            setNewTrip({
+                              ...newTrip,
+                              stops: [...(newTrip.stops || []), newStop]
+                            });
+                            setNewStop({ cityName: '', priceSAR: 0, priceSYP: 0 });
+                          }}
+                          className="bg-emerald-500 text-white p-3 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors"
+                        >
+                          إضافة محطة
+                        </button>
+                      </div>
+                      
+                      {newTrip.stops && newTrip.stops.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          {newTrip.stops.map((stop, idx) => (
+                            <div key={idx} className="bg-white border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-2 text-xs">
+                              <span className="font-bold text-emerald-600">{stop.cityName}</span>
+                              <span className="text-stone-400">({stop.priceSAR} ريال / {stop.priceSYP} ل.س)</span>
+                              <button 
+                                onClick={() => setNewTrip({...newTrip, stops: newTrip.stops?.filter((_, i) => i !== idx)})}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <button onClick={handleAddTrip} className="btn-primary col-span-full">إضافة الرحلة</button>
                 </div>
               </div>
@@ -1010,7 +1102,17 @@ export default function AdminDashboard() {
                     {trips.map(trip => (
                       <tr key={trip.id} className="text-sm">
                         <td className="p-4 font-mono font-bold text-emerald-600">{trip.trackingNumber}</td>
-                        <td className="p-4 font-bold">{trip.from} ← {trip.to}</td>
+                        <td className="p-4 font-bold">
+                          <div>{trip.from} ← {trip.to}</div>
+                          {trip.stops && trip.stops.length > 0 && (
+                            <div className="text-[10px] text-stone-400 font-normal mt-1 flex flex-wrap gap-1">
+                              <span>المحطات:</span>
+                              {trip.stops.map((s, i) => (
+                                <span key={i} className="bg-stone-100 px-1 rounded">{s.cityName}</span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
                         <td className="p-4">
                           <span className={`text-[10px] px-2 py-1 rounded-full ${trip.tripType === 'umrah' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
                             {trip.tripType === 'umrah' ? 'عمرة' : 'دولية'}
@@ -1236,6 +1338,11 @@ export default function AdminDashboard() {
                                 <>
                                   <p className="font-bold">{booking.passengerName}</p>
                                   <p className="text-xs text-stone-400">{booking.passengerPhone}</p>
+                                  {booking.from && booking.to && (
+                                    <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                                      {booking.from} ← {booking.to}
+                                    </p>
+                                  )}
                                 </>
                               )}
                             </td>
@@ -1402,12 +1509,12 @@ export default function AdminDashboard() {
                                     }}>
                                       <div style={{ flex: 1 }}>
                                         <p style={{ margin: 0, fontSize: '10px', color: '#059669', fontWeight: 'normal' }}>من</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#065f46' }}>{trips.find(t => t.id === booking.tripId)?.from}</p>
+                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#065f46' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
                                       </div>
                                       <div style={{ color: '#6ee7b7', fontSize: '24px' }}>←</div>
                                       <div style={{ flex: 1, textAlign: 'left' }}>
                                         <p style={{ margin: 0, fontSize: '10px', color: '#059669', fontWeight: 'normal' }}>إلى</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#065f46' }}>{trips.find(t => t.id === booking.tripId)?.to}</p>
+                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#065f46' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
                                       </div>
                                     </div>
 
@@ -1446,11 +1553,11 @@ export default function AdminDashboard() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                       <div>
                                         <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>من</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{trips.find(t => t.id === booking.tripId)?.from}</p>
+                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
                                       </div>
                                       <div>
                                         <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>إلى</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{trips.find(t => t.id === booking.tripId)?.to}</p>
+                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
                                       </div>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -1666,7 +1773,19 @@ export default function AdminDashboard() {
 
           {activeTab === 'parcels' && canSeeTab('parcels') && (
             <motion.div key="parcels" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
-              <h2 className="text-2xl font-bold">إدارة شحن الطرود</h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 className="text-2xl font-bold">إدارة شحن الطرود</h2>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="بحث بالاسم، البوليصة، أو الهاتف..." 
+                    value={parcelSearch}
+                    onChange={e => setParcelSearch(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl pr-10 pl-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                  />
+                </div>
+              </div>
 
               <div className="card space-y-6">
                 <h3 className="font-bold text-emerald-600">إنشاء شحنة طرد جديدة</h3>
@@ -1734,7 +1853,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-right">
                   <thead className="bg-stone-50 border-b">
                     <tr className="text-xs text-stone-400 uppercase">
-                      <th className="p-4">رقم التتبع</th>
+                      <th className="p-4">رقم بوليصة الشحن</th>
                       <th className="p-4">المرسل والمستلم</th>
                       <th className="p-4">المسار</th>
                       <th className="p-4">السعر</th>
@@ -1743,9 +1862,21 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {parcels.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(parcel => (
+                    {parcels
+                      .filter(p => {
+                        const s = parcelSearch.toLowerCase();
+                        return !s || 
+                          p.waybillNumber?.toLowerCase().includes(s) ||
+                          p.trackingNumber?.toLowerCase().includes(s) ||
+                          p.senderName.toLowerCase().includes(s) ||
+                          p.receiverName.toLowerCase().includes(s) ||
+                          p.senderPhone.includes(s) ||
+                          p.receiverPhone.includes(s);
+                      })
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map(parcel => (
                       <tr key={parcel.id} className="text-sm hover:bg-stone-50 transition-colors">
-                        <td className="p-4 font-mono font-bold text-emerald-600">{parcel.trackingNumber}</td>
+                        <td className="p-4 font-mono font-bold text-emerald-600">{parcel.waybillNumber}</td>
                         <td className="p-4">
                           <div className="space-y-1">
                             <p><span className="text-stone-400">من:</span> {parcel.senderName}</p>
@@ -1784,7 +1915,7 @@ export default function AdminDashboard() {
                               <Printer size={18} />
                             </button>
                             <button 
-                              onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.trackingNumber}`)}
+                              onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)}
                               className="p-2 text-stone-400 hover:text-red-500 transition-colors"
                               title="حذف"
                             >
