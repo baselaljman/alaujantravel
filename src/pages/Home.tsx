@@ -4,6 +4,7 @@ import { MapPin, Shield, Clock, Phone, Search, Calendar, Package, Globe, Moon } 
 import { motion } from 'framer-motion';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import { arSA } from 'date-fns/locale/ar-SA';
+import { format } from 'date-fns';
 import "react-datepicker/dist/react-datepicker.css";
 import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -222,7 +223,7 @@ export default function Home() {
                 <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none z-10" size={18} />
                 <DatePicker
                   selected={search.date ? new Date(search.date) : null}
-                  onChange={(date: Date | null) => setSearch({...search, date: date ? date.toISOString().split('T')[0] : ''})}
+                  onChange={(date: Date | null) => setSearch({...search, date: date ? format(date, 'yyyy-MM-dd') : ''})}
                   locale="ar-SA"
                   dateFormat="yyyy/MM/dd"
                   placeholderText="يوم / شهر / سنة"
