@@ -23,11 +23,14 @@ export default function DriverDashboard() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [passengers, setPassengers] = useState<any[]>([]);
   const watcherIdRef = React.useRef<string | null>(null);
+  const isBroadcastingRef = React.useRef(false);
   const lastSyncTimeRef = React.useRef<number>(0);
   const activeTripRef = React.useRef<Trip | null>(null);
   const userRef = React.useRef<any>(null);
+  const lastLocalStatusUpdateRef = React.useRef<number>(0);
   const [showBatteryWarning, setShowBatteryWarning] = useState(false);
 
   useEffect(() => {
@@ -37,6 +40,10 @@ export default function DriverDashboard() {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    isBroadcastingRef.current = isBroadcasting;
+  }, [isBroadcasting]);
 
   useEffect(() => {
     // Check if we are on Android to show battery warning
@@ -70,9 +77,17 @@ export default function DriverDashboard() {
       
       // Set active trip if any is currently 'active'
       const active = tripsData.find(t => t.status === 'active');
-      setActiveTrip(active || null);
-      if (active) {
-        fetchPassengers(active.id);
+      
+      // Only update if it doesn't conflict with a very recent local change
+      const now = Date.now();
+      if (now - lastLocalStatusUpdateRef.current > 5000) {
+        setActiveTrip(active || null);
+        if (active) {
+          fetchPassengers(active.id);
+          setIsBroadcasting(true);
+        } else {
+          setIsBroadcasting(false);
+        }
       }
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'trips');
@@ -92,6 +107,19 @@ export default function DriverDashboard() {
 
   const updateTripStatus = async (tripId: string, status: Trip['status']) => {
     try {
+      lastLocalStatusUpdateRef.current = Date.now();
+      
+      if (status === 'active') {
+        const tripToStart = trips.find(t => t.id === tripId);
+        if (tripToStart) {
+          setActiveTrip({ ...tripToStart, status: 'active' });
+        }
+        setIsBroadcasting(true);
+      } else if (status === 'completed' || status === 'cancelled' || status === 'paused') {
+        if (status !== 'paused') setActiveTrip(null);
+        setIsBroadcasting(false);
+      }
+
       await updateDoc(doc(db, 'trips', tripId), { status });
       
       // Update associated parcels status automatically
@@ -105,20 +133,9 @@ export default function DriverDashboard() {
         );
         await Promise.all(updatePromises);
       }
-
-      if (status === 'active') {
-        // Manually update active trip locally to trigger tracking immediately
-        const tripToStart = trips.find(t => t.id === tripId);
-        if (tripToStart) {
-          setActiveTrip({ ...tripToStart, status: 'active' });
-        }
-        setIsBroadcasting(true);
-      } else if (status === 'completed' || status === 'cancelled') {
-        setIsBroadcasting(false);
-        setActiveTrip(null);
-      }
     } catch (error) {
       console.error('Error updating trip status:', error);
+      lastLocalStatusUpdateRef.current = 0; // Reset on error to allow snapshot to take over
     }
   };
 
@@ -148,8 +165,8 @@ export default function DriverDashboard() {
                 requestPermissions: true,
                 stale: false,
                 distanceFilter: 0, // Trigger on any movement
-                interval: 5000,    // Hint 5s interval for Android
-                fastestInterval: 3000,
+                interval: 20000,    // 20s interval
+                fastestInterval: 10000,
                 priority: 100,     // PRIORITY_HIGH_ACCURACY
                 stopOnTerminate: false // Keep running even if app is swiped away
               },
@@ -161,11 +178,12 @@ export default function DriverDashboard() {
                 
                 const currentTrip = activeTripRef.current;
                 const currentUser = userRef.current;
+                const isBroadcastingNow = isBroadcastingRef.current;
 
-                if (location && currentTrip && currentUser) {
+                if (location && currentTrip && currentUser && isBroadcastingNow) {
                   const now = Date.now();
-                  // Force sync every 10 seconds
-                  if (now - lastSyncTimeRef.current >= 10000) {
+                  // Force sync every 20 seconds
+                  if (now - lastSyncTimeRef.current >= 20000) {
                     const locationData: LiveLocation = {
                       driverId: currentUser.uid,
                       tripId: currentTrip.id,
@@ -175,12 +193,12 @@ export default function DriverDashboard() {
                     };
                     
                     try {
-                      // Note: Since offline persistence is disabled in firebase.ts,
-                      // this write will only succeed if the device is currently online.
-                      // It will NOT be stored to be sent later if offline.
-                      await setDoc(doc(db, 'locations', currentTrip.id), locationData);
-                      lastSyncTimeRef.current = now;
-                      console.log(`[BG SYNC] ${new Date().toLocaleTimeString()}: ${location.latitude}, ${location.longitude}`);
+                      if (isBroadcastingRef.current) {
+                        await setDoc(doc(db, 'locations', currentTrip.id), locationData);
+                        lastSyncTimeRef.current = now;
+                        setLastSyncTime(new Date().toLocaleTimeString('ar-EG'));
+                        console.log(`[BG SYNC] ${new Date().toLocaleTimeString()}: ${location.latitude}, ${location.longitude}`);
+                      }
                     } catch (err) {
                       console.error('BG Sync Error:', err);
                     }
@@ -198,7 +216,9 @@ export default function DriverDashboard() {
             const now = Date.now();
             const currentTrip = activeTripRef.current;
             const currentUser = userRef.current;
-            if (now - lastSyncTimeRef.current >= 10000 && currentTrip && currentUser) {
+            const isBroadcastingNow = isBroadcastingRef.current;
+
+            if (now - lastSyncTimeRef.current >= 20000 && currentTrip && currentUser && isBroadcastingNow) {
               const locationData: LiveLocation = {
                 driverId: currentUser.uid,
                 tripId: currentTrip.id,
@@ -375,6 +395,12 @@ export default function DriverDashboard() {
                   <span className="text-stone-400">رقم التتبع:</span>
                   <span className="font-mono text-emerald-400">{activeTrip.trackingNumber}</span>
                 </div>
+                {lastSyncTime && (
+                  <div className="flex justify-between text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md">
+                    <span>آخر تحديث للموقع:</span>
+                    <span className="font-bold">{lastSyncTime}</span>
+                  </div>
+                )}
                 <hr className="border-stone-800" />
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-stone-400">بث الموقع:</span>
