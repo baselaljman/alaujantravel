@@ -144,7 +144,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'photoURL', 'createdAt', 'permissions', 'phoneNumber', 'fcmToken']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'photoURL', 'createdAt', 'permissions', 'phoneNumber', 'fcmToken', 'deviceType']) &&
              (!('uid' in data) || data.uid is string) &&
              isValidEmail(data.email) &&
              data.displayName is string &&
@@ -152,6 +152,7 @@ service cloud.firestore {
              (!('photoURL' in data) || data.photoURL is string) &&
              (!('phoneNumber' in data) || data.phoneNumber is string) &&
              (!('fcmToken' in data) || data.fcmToken is string) &&
+             (!('deviceType' in data) || data.deviceType is string) &&
              (!('createdAt' in data) || data.createdAt is string) &&
              (!('permissions' in data) || data.permissions is list);
     }
@@ -253,7 +254,7 @@ service cloud.firestore {
                     (isOwner(userId) || isAdmin());
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
                     ((isOwner(userId) && request.resource.data.role == resource.data.role) || 
-                     (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken'])) ||
+                     (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken', 'deviceType'])) ||
                      isAdmin() || hasPermission('manage_users'));
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.email == request.auth.token.email);
     }

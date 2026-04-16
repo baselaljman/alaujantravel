@@ -781,15 +781,33 @@ export default function AdminDashboard() {
               {!notificationStatus?.initialized && (
                 <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl text-amber-800 text-xs space-y-2">
                   <p className="font-bold">تنبيه: خدمة الإشعارات (Push) غير مكتملة الإعداد</p>
-                  <p>لإرسال إشعارات حقيقية للهواتف، يجب توفير ملف "Service Account" من Firebase Console.</p>
+                  <p>لإرسال إشعارات حقيقية للهواتف، يجب توفير الملفات التالية:</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>اذهب إلى Firebase Console {'>'} Project Settings {'>'} Service Accounts</li>
-                    <li>قم بإنشاء مفتاح جديد (Generate new private key)</li>
-                    <li>قم بتسمية الملف <code>service-account.json</code> ووضعه في المجلد الرئيسي للتطبيق</li>
-                    <li>أو قم بإضافته كمتغير بيئة باسم <code>FIREBASE_SERVICE_ACCOUNT</code></li>
+                    <li><strong>للخادم (Backend):</strong> ملف <code>service-account.json</code> من Firebase Console {'>'} Project Settings {'>'} Service Accounts.</li>
+                    <li><strong>لتطبيق الأندرويد:</strong> ملف <code>google-services.json</code> من Firebase Console {'>'} Project Settings {'>'} General {'>'} Your Apps.</li>
+                    <li>يجب وضع <code>service-account.json</code> في المجلد الرئيسي، و <code>google-services.json</code> في مجلد <code>android/app/</code>.</li>
                   </ul>
                 </div>
               )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
+                  <p className="text-xs text-stone-500 mb-1">إجمالي المستخدمين</p>
+                  <p className="text-xl font-bold">{users.length}</p>
+                </div>
+                <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                  <p className="text-xs text-emerald-600 mb-1">مسجلين للإشعارات</p>
+                  <p className="text-xl font-bold text-emerald-700">{users.filter(u => !!u.fcmToken).length}</p>
+                </div>
+                <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                  <p className="text-xs text-blue-600 mb-1">أندرويد</p>
+                  <p className="text-xl font-bold text-blue-700">{users.filter(u => u.deviceType === 'android' && !!u.fcmToken).length}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100">
+                  <p className="text-xs text-purple-600 mb-1">آيفون</p>
+                  <p className="text-xl font-bold text-purple-700">{users.filter(u => u.deviceType === 'ios' && !!u.fcmToken).length}</p>
+                </div>
+              </div>
               
               <div className="card space-y-4">
                 <h3 className="font-bold text-emerald-600">إرسال إشعار جديد</h3>
@@ -1683,7 +1701,16 @@ export default function AdminDashboard() {
                           {user.role === 'admin' && <span className="text-xs text-emerald-600 font-bold">صلاحيات كاملة</span>}
                         </td>
                         <td className="p-4">
-                          <button onClick={() => updateRole(user.uid, 'user')} className="text-red-500 text-xs">تنزيل لرتبة مستخدم</button>
+                          <div className="flex items-center gap-3">
+                            <button onClick={() => updateRole(user.uid, 'user')} className="text-stone-400 hover:text-stone-600 text-xs font-bold">تنزيل لرتبة مستخدم</button>
+                            <button 
+                              onClick={() => handleDeleteRequest('users', user.uid, user.displayName)} 
+                              className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition-colors"
+                              title="حذف المستخدم نهائياً"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

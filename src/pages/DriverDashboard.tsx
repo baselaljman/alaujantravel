@@ -107,9 +107,15 @@ export default function DriverDashboard() {
       }
 
       if (status === 'active') {
+        // Manually update active trip locally to trigger tracking immediately
+        const tripToStart = trips.find(t => t.id === tripId);
+        if (tripToStart) {
+          setActiveTrip({ ...tripToStart, status: 'active' });
+        }
         setIsBroadcasting(true);
       } else if (status === 'completed' || status === 'cancelled') {
         setIsBroadcasting(false);
+        setActiveTrip(null);
       }
     } catch (error) {
       console.error('Error updating trip status:', error);
@@ -223,7 +229,7 @@ export default function DriverDashboard() {
         watcherIdRef.current = null;
       }
     };
-  }, [isBroadcasting]); // Only depend on isBroadcasting to avoid re-creating watcher
+  }, [isBroadcasting, activeTrip?.id, user?.uid]); // Also depend on activeTrip to catch if it becomes available after broadcasting starts
 
   if (profile?.role !== 'driver') {
     return <div className="text-center py-20">عذراً، هذه الصفحة مخصصة للسائقين فقط.</div>;
