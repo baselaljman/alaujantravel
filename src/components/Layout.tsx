@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bus, User, MapPin, Package, LayoutDashboard, LogOut, Bell, X } from 'lucide-react';
+import { Bus, User, MapPin, Package, LayoutDashboard, LogOut, Bell, X, Menu } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { initializePushNotifications } from '../services/notificationService';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { App } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { Capacitor } from '@capacitor/core';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, logout } = useAuth();
@@ -32,8 +34,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Initialize Push Notifications
+  // Initialize Status Bar & Push Notifications
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setStyle({ style: Style.Light });
+      // On Android, we might want to set a background color that matches our theme
+      if (Capacitor.getPlatform() === 'android') {
+        StatusBar.setBackgroundColor({ color: '#ffffff' });
+      }
+    }
+    
     if (user) {
       initializePushNotifications().catch(err => console.log('Push init skipped:', err.message));
     }
@@ -99,11 +109,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{ height: 'var(--app-height, 100%)' }} className="flex flex-col font-sans overflow-hidden">
+    <div style={{ height: 'var(--app-height, 100%)' }} className="flex flex-col font-sans overflow-hidden bg-emerald-800">
+      {/* Status Bar Background Spacer (matches navbar theme color) */}
+      <div 
+        style={{ height: 'env(safe-area-inset-top)' }} 
+        className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-[60]"
+      />
+
       {/* Navbar */}
       <nav 
-        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
-        className="glass sticky top-0 z-50 px-2 sm:px-4 pb-2 sm:pb-3 flex items-center justify-between shadow-sm shrink-0 flex-nowrap"
+        style={{ 
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))' 
+        }}
+        className="glass sticky top-0 z-50 py-4 flex items-center justify-between shadow-md shrink-0 flex-nowrap"
       >
         <Link to="/" className="flex items-center gap-1 shrink-0">
           <img 
@@ -148,7 +167,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto pb-20 sm:pb-12 min-h-0">
+      <main 
+        style={{ 
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))' 
+        }}
+        className="flex-1 max-w-7xl mx-auto w-full py-4 sm:py-6 overflow-y-auto pb-20 sm:pb-12 min-h-0 bg-stone-50"
+      >
         {children}
         
         {/* Footer inside scrollable area */}
