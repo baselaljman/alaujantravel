@@ -363,7 +363,12 @@ export default function Profile() {
                             }}
                           />
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <img src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/bus-svgrepo-com-1.svg" alt="Logo" style={{ width: '48px', height: '48px' }} />
+                            <img 
+                              src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+                              alt="Logo" 
+                              referrerPolicy="no-referrer"
+                              style={{ width: '48px', height: '48px', objectFit: 'contain' }} 
+                            />
                             <div style={{ textAlign: 'right' }}>
                               <p style={{ fontSize: '12px', color: '#a8a29e', margin: 0 }}>تذكرة سفر دولية</p>
                               <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>العوجان للسياحة</p>

@@ -40,13 +40,13 @@ export default function AdminDashboard() {
   const [newTrip, setNewTrip] = useState<Partial<Trip>>({
     from: '', to: '', date: '', time: '', 
     busNumber: '', price: 0, priceSAR: 300, priceSYP: 1000000, busType: 'Standard', 
-    totalSeats: 45, status: 'scheduled', tripType: 'international',
+    totalSeats: 35, status: 'scheduled', tripType: 'international',
     stops: []
   });
   const [newStop, setNewStop] = useState<TripStop>({ cityName: '', priceSAR: 0, priceSYP: 0 });
   const [newBus, setNewBus] = useState<Partial<Bus>>({
     plateNumber: '', busNumber: '', model: '', 
-    capacity: 45, type: 'Standard', status: 'active',
+    capacity: 35, type: 'Standard', status: 'active',
     driverId: ''
   });
   const [newUser, setNewUser] = useState({
@@ -332,18 +332,20 @@ export default function AdminDashboard() {
       });
 
       const selectedBus = buses.find(b => b.busNumber === newTrip.busNumber);
+      const tripCapacity = selectedBus?.capacity || newTrip.totalSeats || 35;
 
       await addDoc(collection(db, 'trips'), { 
         ...newTrip, 
+        totalSeats: tripCapacity,
         price: newTrip.priceSAR || 0, // Default to SAR for backward compatibility
-        availableSeats: newTrip.totalSeats,
+        availableSeats: tripCapacity,
         bookedSeats: [],
         trackingNumber,
         driverId: selectedBus?.driverId || '',
         tripType: newTrip.tripType || 'international',
         stops: newTrip.stops || []
       });
-      setNewTrip({ ...newTrip, date: '', time: '', busNumber: '', priceSAR: 300, priceSYP: 1000000, tripType: 'international', stops: [] });
+      setNewTrip({ ...newTrip, date: '', time: '', busNumber: '', totalSeats: 35, priceSAR: 300, priceSYP: 1000000, tripType: 'international', stops: [] });
     } catch (error) {
       console.error('Error adding trip:', error);
     }
@@ -352,7 +354,7 @@ export default function AdminDashboard() {
   const handleAddBus = async () => {
     if (!newBus.plateNumber || !newBus.busNumber) return;
     await addDoc(collection(db, 'buses'), newBus);
-    setNewBus({ plateNumber: '', busNumber: '', model: '', capacity: 45, type: 'Standard', status: 'active', driverId: '' });
+    setNewBus({ plateNumber: '', busNumber: '', model: '', capacity: 35, type: 'Standard', status: 'active', driverId: '' });
   };
 
   const handleAddBanner = async () => {
@@ -591,8 +593,14 @@ export default function AdminDashboard() {
     setNewUser({ displayName: '', email: '', phoneNumber: '', role: newUser.role });
   };
 
-  const updateRole = async (uid: string, role: any, permissions?: string[]) => {
-    await updateDoc(doc(db, 'users', uid), { role, permissions: permissions || [] });
+  const updateRole = async (uid: string, role: string) => {
+    const user = users.find(u => u.uid === uid);
+    const updates: any = { role };
+    // If changing to staff and didn't have permissions, initialize them
+    if (role === 'staff' && !user?.permissions) {
+      updates.permissions = [];
+    }
+    await updateDoc(doc(db, 'users', uid), updates);
   };
 
   const handleDeleteRequest = (coll: string, id: string, label: string) => {
@@ -1008,12 +1016,25 @@ export default function AdminDashboard() {
                   </select>
                   <input type="date" value={newTrip.date} onChange={e => setNewTrip({...newTrip, date: e.target.value})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                   <input type="time" value={newTrip.time} onChange={e => setNewTrip({...newTrip, time: e.target.value})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
-                  <select value={newTrip.busNumber} onChange={e => setNewTrip({...newTrip, busNumber: e.target.value})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+                  <select 
+                    value={newTrip.busNumber} 
+                    onChange={e => {
+                      const busNum = e.target.value;
+                      const bus = buses.find(b => b.busNumber === busNum);
+                      setNewTrip({
+                        ...newTrip, 
+                        busNumber: busNum,
+                        totalSeats: bus?.capacity || newTrip.totalSeats || 35
+                      });
+                    }} 
+                    className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
                     <option value="">اختر الحافلة</option>
                     {buses.map(b => <option key={b.id} value={b.busNumber}>{b.busNumber} ({b.plateNumber})</option>)}
                   </select>
                   <input type="number" placeholder="السعر (ريال)" value={newTrip.priceSAR} onChange={e => setNewTrip({...newTrip, priceSAR: Number(e.target.value)})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                   <input type="number" placeholder="السعر (ل.س)" value={newTrip.priceSYP} onChange={e => setNewTrip({...newTrip, priceSYP: Number(e.target.value)})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+                  <input type="number" placeholder="عدد المقاعد" value={newTrip.totalSeats} onChange={e => setNewTrip({...newTrip, totalSeats: Number(e.target.value)})} className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                   <select 
                     value={newTrip.tripType} 
                     onChange={e => {
@@ -1212,6 +1233,15 @@ export default function AdminDashboard() {
                       </div>
                       <h4 className="font-bold text-lg">{bus.busNumber}</h4>
                       <p className="text-xs text-stone-400 mb-2">{bus.plateNumber} • {bus.model}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs text-stone-500">السعة:</span>
+                        <input 
+                          type="number" 
+                          value={bus.capacity} 
+                          onChange={(e) => updateDoc(doc(db, 'buses', bus.id), { capacity: Number(e.target.value) })}
+                          className="bg-stone-100 px-2 py-1 rounded text-xs w-16 font-bold"
+                        />
+                      </div>
                       <p className="text-xs font-bold text-emerald-600 mb-4">
                         {driver ? `السائق: ${driver.displayName}` : 'بدون سائق'}
                       </p>
@@ -1488,7 +1518,12 @@ export default function AdminDashboard() {
                                       alignItems: 'flex-start' 
                                     }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <img src="https://xn--ogbhrq.vip/wp-content/uploads/2026/03/bus-svgrepo-com-1.svg" alt="Logo" style={{ width: '40px', height: '40px' }} />
+                                        <img 
+                                          src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+                                          alt="Logo" 
+                                          referrerPolicy="no-referrer"
+                                          style={{ width: '40px', height: '40px', objectFit: 'contain' }} 
+                                        />
                                         <div>
                                           <h2 style={{ margin: 0, color: '#065f46', fontSize: '20px', fontWeight: 'bold' }}>العوجان للسياحة</h2>
                                           <p style={{ margin: 0, fontSize: '10px', color: '#666666' }}>INTERNATIONAL BOARDING PASS</p>
@@ -1766,7 +1801,12 @@ export default function AdminDashboard() {
                 {banners.sort((a, b) => a.order - b.order).map(banner => (
                   <div key={banner.id} className="card p-0 overflow-hidden group">
                     <div className="h-40 relative">
-                      <img src={banner.imageUrl} alt="" className="w-full h-full object-cover" />
+                      <img 
+                        src={banner.imageUrl} 
+                        alt="" 
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover" 
+                      />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                         <button 
                           onClick={() => toggleBannerStatus(banner.id, banner.active)}

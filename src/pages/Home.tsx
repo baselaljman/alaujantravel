@@ -99,6 +99,7 @@ export default function Home() {
         <img 
           src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/busbanar.png?alt=media" 
           alt="Bus Banner" 
+          referrerPolicy="no-referrer"
           className="absolute inset-0 w-full h-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
@@ -260,6 +261,7 @@ export default function Home() {
                   <img 
                     src={banners[currentBanner].imageUrl} 
                     alt={`Banner ${currentBanner}`}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                   />
                 </Link>
@@ -267,6 +269,7 @@ export default function Home() {
                 <img 
                   src={banners[currentBanner].imageUrl} 
                   alt={`Banner ${currentBanner}`}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
                 />
               )}
@@ -326,6 +329,7 @@ export default function Home() {
               whileInView={{ x: 0, opacity: 1 }}
               src="https://i.postimg.cc/8cGGpC8d/parcel.png" 
               alt="Parcel Delivery" 
+              referrerPolicy="no-referrer"
               className="w-full max-w-sm mx-auto drop-shadow-2xl"
             />
           </div>

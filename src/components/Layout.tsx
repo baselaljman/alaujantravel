@@ -106,7 +106,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         className="glass sticky top-0 z-50 px-2 sm:px-4 pb-2 sm:pb-3 flex items-center justify-between shadow-sm shrink-0 flex-nowrap"
       >
         <Link to="/" className="flex items-center gap-1 shrink-0">
-          <img src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" alt="Logo" className="w-7 h-7 sm:w-10 sm:h-10" />
+          <img 
+            src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+            alt="Logo" 
+            referrerPolicy="no-referrer"
+            className="w-7 h-7 sm:w-10 sm:h-10" 
+          />
           <span className="text-base sm:text-xl font-bold text-emerald-800 hidden md:block">العوجان للسياحة</span>
         </Link>
 

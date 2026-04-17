@@ -5,12 +5,13 @@ import { Mail, Lock, User, LogIn, UserPlus, Chrome } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
-  const { login, loginWithEmail, registerWithEmail, user } = useAuth();
+  const { login, loginWithEmail, registerWithEmail, resetPassword, user } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -49,6 +50,24 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('يرجى إدخال البريد الإلكتروني أولاً');
+      return;
+    }
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      await resetPassword(email);
+      setMessage('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني');
+    } catch (err: any) {
+      setError(err.message || 'فشل إرسال رابط إعادة التعيين');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto mt-10 p-6">
       <motion.div
@@ -68,6 +87,12 @@ export default function Login() {
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs text-center border border-red-100">
             {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="bg-emerald-50 text-emerald-600 p-3 rounded-xl text-xs text-center border border-emerald-100">
+            {message}
           </div>
         )}
 
@@ -105,10 +130,23 @@ export default function Login() {
               placeholder="كلمة المرور"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              required={!loading}
               className="w-full bg-stone-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
+
+          {!isRegister && (
+            <div className="flex justify-start">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs text-stone-500 hover:text-emerald-600 transition-colors"
+                disabled={loading}
+              >
+                نسيت كلمة السر؟
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"

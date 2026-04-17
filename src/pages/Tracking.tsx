@@ -21,7 +21,11 @@ const AujanIcon = L.divIcon({
   html: `
     <div style="display: flex; flex-direction: column; align-items: center;">
       <div style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #059669; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); overflow: hidden; display: flex; align-items: center; justify-content: center;">
-        <img src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" style="width: 32px; height: 32px; object-fit: contain;" />
+        <img 
+          src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+          referrerPolicy="no-referrer"
+          style="width: 32px; height: 32px; object-fit: contain;" 
+        />
       </div>
       <div style="background: #059669; color: white; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 9999px; margin-top: 4px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); white-space: nowrap;">
         العوجان
