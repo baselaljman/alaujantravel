@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail } from '../firebase';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import { auth, db, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider } from '../firebase';
+import { onAuthStateChanged, signInWithPopup, signOut, User, ConfirmationResult } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -14,6 +14,8 @@ interface AuthContextType {
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  signInWithPhone: (phoneNumber: string, recaptchaContainerId?: string) => Promise<void>;
+  verifyOtp: (otp: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -23,6 +25,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [verificationId, setVerificationId] = useState<string | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -143,8 +147,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
+  const signInWithPhone = async (phoneNumber: string, recaptchaContainerId?: string) => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
+          phoneNumber,
+        } as any);
+        setVerificationId(result.verificationId);
+      } else {
+        if (!recaptchaContainerId) throw new Error('Recaptcha container ID is required for web');
+        const verifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
+          size: 'invisible',
+        });
+        const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+        setConfirmationResult(result);
+      }
+    } catch (error) {
+      console.error('Phone Sign-In Error:', error);
+      throw error;
+    }
+  };
+
+  const verifyOtp = async (otp: string) => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        if (!verificationId) throw new Error('Verification ID not found');
+        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
+          verificationId,
+          verificationCode: otp,
+        } as any);
+        
+        if (result.credential?.verificationId && result.credential?.verificationCode) {
+           const credential = PhoneAuthProvider.credential(result.credential.verificationId, result.credential.verificationCode);
+           await signInWithCredential(auth, credential);
+        }
+      } else {
+        if (!confirmationResult) throw new Error('Confirmation result not found');
+        await confirmationResult.confirm(otp);
+      }
+    } catch (error) {
+      console.error('OTP Verification Error:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, loginWithEmail, registerWithEmail, resetPassword, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, login, loginWithEmail, registerWithEmail, resetPassword, signInWithPhone, verifyOtp, logout }}>
       {children}
     </AuthContext.Provider>
   );
