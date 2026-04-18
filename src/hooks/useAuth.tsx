@@ -150,14 +150,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithPhone = async (phoneNumber: string, recaptchaContainerId?: string) => {
     try {
       if (Capacitor.isNativePlatform()) {
-        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
+        console.log('Starting native phone sign-in for:', phoneNumber);
+        const result = await FirebaseAuthentication.signInWithPhoneNumber({
           phoneNumber,
-        } as any);
-        setVerificationId(result.verificationId);
+        });
+        
+        console.log('Native phone sign-in result:', result);
+        
+        if (result && result.verificationId) {
+          setVerificationId(result.verificationId);
+        } else {
+          throw new Error('فشل الحصول على رمز التحقق من النظام. تأكد من إعدادات SHA-256 في Firebase.');
+        }
       } else {
         if (!recaptchaContainerId) throw new Error('Recaptcha container ID is required for web');
         
-        // Ensure the container exists and is clean
         const container = document.getElementById(recaptchaContainerId);
         if (!container) throw new Error(`Container with ID ${recaptchaContainerId} not found`);
         container.innerHTML = '<div id="recaptcha-widget"></div>';
@@ -171,40 +178,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.error('Detailed Phone Sign-In Error:', error);
+      const errorMessage = error.message || String(error);
       
-      // Handle known error codes
-      if (error.code === 'auth/unauthorized-domain') {
-        throw new Error('هذا النطاق غير مصرح به. يرجى إضافة رابط المعاينة إلى Authorized Domains في Firebase Console.');
-      } else if (error.code === 'auth/invalid-phone-number') {
-        throw new Error('رقم الهاتف المدخل غير صحيح. تأكد من إدخاله بالصيغة الدولية.');
-      } else if (error.code === 'auth/too-many-requests') {
-        throw new Error('تم إرسال الكثير من الطلبات. يرجى المحاولة لاحقاً.');
+      if (errorMessage.includes('unauthorized-domain')) {
+        throw new Error('هذا النطاق غير مصرح به في Firebase Console.');
+      } else if (errorMessage.includes('invalid-phone-number')) {
+        throw new Error('رقم الهاتف المدخل غير صحيح.');
       }
       
-      throw error;
+      throw new Error(errorMessage);
     }
   };
 
   const verifyOtp = async (otp: string) => {
     try {
       if (Capacitor.isNativePlatform()) {
-        if (!verificationId) throw new Error('Verification ID not found');
-        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
+        if (!verificationId) throw new Error('لم يتم العثور على رمز التحقق الأصلي.');
+        
+        console.log('Verifying native OTP:', otp);
+        const result = await FirebaseAuthentication.signInWithPhoneNumber({
           verificationId,
           verificationCode: otp,
-        } as any);
-        
-        if (result.credential?.verificationId && result.credential?.verificationCode) {
-           const credential = PhoneAuthProvider.credential(result.credential.verificationId, result.credential.verificationCode);
-           await signInWithCredential(auth, credential);
+        });
+
+        console.log('Verification result:', result);
+
+        if (result && result.credential) {
+          // Sync with web SDK auth state
+          const credential = PhoneAuthProvider.credential(
+            result.credential.verificationId || verificationId,
+            result.credential.verificationCode || otp
+          );
+          await signInWithCredential(auth, credential);
+        } else if (result && !result.credential) {
+             console.warn('Login successful but no credential returned from native plugin');
         }
       } else {
         if (!confirmationResult) throw new Error('Confirmation result not found');
         await confirmationResult.confirm(otp);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('OTP Verification Error:', error);
-      throw error;
+      throw new Error('كود التحقق غير صحيح أو انتهت صلاحيته.');
     }
   };
 
