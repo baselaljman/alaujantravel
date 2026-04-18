@@ -156,14 +156,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setVerificationId(result.verificationId);
       } else {
         if (!recaptchaContainerId) throw new Error('Recaptcha container ID is required for web');
-        const verifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
+        
+        // Ensure the container exists and is clean
+        const container = document.getElementById(recaptchaContainerId);
+        if (!container) throw new Error(`Container with ID ${recaptchaContainerId} not found`);
+        container.innerHTML = '<div id="recaptcha-widget"></div>';
+
+        const verifier = new RecaptchaVerifier(auth, 'recaptcha-widget', {
           size: 'invisible',
         });
+        
         const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
         setConfirmationResult(result);
       }
-    } catch (error) {
-      console.error('Phone Sign-In Error:', error);
+    } catch (error: any) {
+      console.error('Detailed Phone Sign-In Error:', error);
+      
+      // Handle known error codes
+      if (error.code === 'auth/unauthorized-domain') {
+        throw new Error('هذا النطاق غير مصرح به. يرجى إضافة رابط المعاينة إلى Authorized Domains في Firebase Console.');
+      } else if (error.code === 'auth/invalid-phone-number') {
+        throw new Error('رقم الهاتف المدخل غير صحيح. تأكد من إدخاله بالصيغة الدولية.');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('تم إرسال الكثير من الطلبات. يرجى المحاولة لاحقاً.');
+      }
+      
       throw error;
     }
   };
