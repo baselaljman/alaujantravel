@@ -172,9 +172,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         const container = document.getElementById(recaptchaContainerId);
         if (!container) throw new Error(`Container with ID ${recaptchaContainerId} not found`);
-        container.innerHTML = '<div id="recaptcha-widget"></div>';
+        
+        // Use a persistent widget ID to avoid re-creation issues
+        const widgetId = 'recaptcha-widget-main';
+        let widget = document.getElementById(widgetId);
+        if (!widget) {
+          widget = document.createElement('div');
+          widget.id = widgetId;
+          container.innerHTML = '';
+          container.appendChild(widget);
+        }
 
-        const verifier = new RecaptchaVerifier(auth, 'recaptcha-widget', {
+        const verifier = new RecaptchaVerifier(auth, widgetId, {
           size: 'invisible',
           callback: () => {
             console.log('reCAPTCHA solved');
@@ -184,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         });
         
-        // Force rendering to ensure it's ready
+        // Explicitly render to ensure verifier is initialized
         await verifier.render();
         
         const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
@@ -192,14 +201,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.error('Detailed Phone Sign-In Error:', error);
+      const errorCode = error.code || '';
       const errorMessage = error.message || String(error);
       
       if (errorMessage.includes('unauthorized-domain')) {
         throw new Error('هذا النطاق غير مصرح به في Firebase Console.');
       } else if (errorMessage.includes('invalid-phone-number')) {
         throw new Error('رقم الهاتف المدخل غير صحيح.');
-      } else if (errorMessage.includes('-39') || errorMessage.includes('internal-error')) {
-        throw new Error('خطأ في التحقق من هوية التطبيق. يرجى تفعيل Play Integrity و Identity Platform في Firebase Console.');
+      } else if (errorMessage.includes('-39') || errorCode.includes('internal-error')) {
+        throw new Error('عذراً، فشل نظام الحماية في التحقق. تأكد من تفعيل "Identity Platform" و "App Check" في Firebase Console بشكل كامل وربطهما بمفتاح reCAPTCHA Enterprise الصحيح.');
       }
       
       throw new Error(errorMessage);

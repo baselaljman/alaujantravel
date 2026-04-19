@@ -8,20 +8,21 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 
+// App Check Debug Token - MUST be set BEFORE initializeAppCheck
+if (typeof window !== 'undefined') {
+  // @ts-ignore
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = 'a10107b9-7971-4769-a443-6ef597d6d64c';
+}
+
 // Initialize App Check with reCAPTCHA Enterprise
 if (typeof window !== 'undefined') {
-  // Use the reCAPTCHA Enterprise site key provided by the user
   const RECAPTCHA_SITE_KEY = '6Lf7Z78sAAAAAHh4tiZJE6-C6dkx9YmrAcA0O0oy';
   
-  // Enable debug mode for development and preview environments
-  // @ts-ignore
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-
   initializeAppCheck(app, {
     provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),
     isTokenAutoRefreshEnabled: true
   });
-  console.log('App Check initialized with reCAPTCHA Enterprise in debug mode.');
+  console.log('App Check initialized with reCAPTCHA Enterprise (Debug Token Active)');
 }
 
 // Use initializeFirestore with experimentalForceLongPolling to fix connection issues in some environments

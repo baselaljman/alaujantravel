@@ -89,15 +89,24 @@ export default function Login() {
         
         const formattedPhone = `${selectedCountry.code}${cleanPhone}`;
         
+        setMessage('جاري التحقق من أمان الاتصال...');
         await signInWithPhone(formattedPhone, 'recaptcha-container');
         setShowOtpInput(true);
-        setMessage('تم إرسال كود التحقق إلى هاتفك');
+        setMessage('تم إرسال كود التحقق إلى هاتفك بنجاح ✅');
       } else {
         await verifyOtp(otp);
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'فشل التحقق من رقم الهاتف');
+      console.error('Phone Auth Error:', err);
+      // Detailed error breakdown
+      const msg = err.message || '';
+      if (msg.includes('App Check') || msg.includes('-39')) {
+        setError('خطأ في أمان الاتصال: يرجى التأكد من تسجيل الرمز (Debug Token) في كونسول فايربيس كما هو موضح في الشرح.');
+      } else {
+        setError(msg || 'فشل التحقق من رقم الهاتف. تأكد من صحة الرقم.');
+      }
+      setMessage('');
     } finally {
       setLoading(false);
     }
