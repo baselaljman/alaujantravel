@@ -9,8 +9,14 @@
     <div id="root"></div>
     <script>
       const appHeight = () => {
-        const doc = document.documentElement;
-        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        try {
+          const doc = document.documentElement;
+          if (doc && doc.style) {
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+          }
+        } catch (e) {
+          console.warn('Failed to set app height:', e);
+        }
       }
       window.addEventListener('resize', appHeight);
       appHeight();

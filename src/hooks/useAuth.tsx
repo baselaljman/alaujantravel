@@ -57,10 +57,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setProfile(existingProfile);
             }
           } else {
-            // Check if there's a pre-created profile by email
-            const userEmail = user.email?.toLowerCase() || '';
-            const q = query(collection(db, 'users'), where('email', '==', userEmail));
-            const querySnapshot = await getDocs(q);
+            // Check if there's a pre-created profile by email (only if user has email)
+            const userEmail = user.email?.toLowerCase();
+            let querySnapshot: any = { empty: true };
+            
+            if (userEmail) {
+              const q = query(collection(db, 'users'), where('email', '==', userEmail));
+              querySnapshot = await getDocs(q);
+            }
             
             if (!querySnapshot.empty) {
               const preCreatedDoc = querySnapshot.docs[0];
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 uid: user.uid,
                 email: user.email || '',
                 displayName: user.displayName || 'مسافر',
+                phoneNumber: user.phoneNumber || '',
                 role: role as any,
                 photoURL: user.photoURL || '',
                 createdAt: new Date().toISOString()
@@ -151,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (Capacitor.isNativePlatform()) {
         console.log('Starting native phone sign-in for:', phoneNumber);
-        const result = await FirebaseAuthentication.signInWithPhoneNumber({
+        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
           phoneNumber,
         });
         
@@ -171,7 +176,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const verifier = new RecaptchaVerifier(auth, 'recaptcha-widget', {
           size: 'invisible',
+          callback: () => {
+            console.log('reCAPTCHA solved');
+          },
+          'expired-callback': () => {
+            console.warn('reCAPTCHA expired');
+          }
         });
+        
+        // Force rendering to ensure it's ready
+        await verifier.render();
         
         const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
         setConfirmationResult(result);
@@ -184,6 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('هذا النطاق غير مصرح به في Firebase Console.');
       } else if (errorMessage.includes('invalid-phone-number')) {
         throw new Error('رقم الهاتف المدخل غير صحيح.');
+      } else if (errorMessage.includes('-39') || errorMessage.includes('internal-error')) {
+        throw new Error('خطأ في التحقق من هوية التطبيق. يرجى تفعيل Play Integrity و Identity Platform في Firebase Console.');
       }
       
       throw new Error(errorMessage);
@@ -196,10 +212,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!verificationId) throw new Error('لم يتم العثور على رمز التحقق الأصلي.');
         
         console.log('Verifying native OTP:', otp);
-        const result = await FirebaseAuthentication.signInWithPhoneNumber({
+        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
           verificationId,
           verificationCode: otp,
-        });
+        } as any);
 
         console.log('Verification result:', result);
 

@@ -111,14 +111,18 @@ export default function Profile() {
   useEffect(() => {
     if (!user) return;
 
-    // Query bookings by userId OR passengerEmail
-    const q = query(
-      collection(db, 'bookings'),
-      or(
-        where('userId', '==', user.uid),
-        where('passengerEmail', '==', user.email)
-      )
-    );
+    // Query bookings by userId OR passengerEmail OR passengerPhone
+    const constraints = [where('userId', '==', user.uid)];
+    if (user.email) {
+      constraints.push(where('passengerEmail', '==', user.email));
+    }
+    if (user.phoneNumber) {
+      constraints.push(where('passengerPhone', '==', user.phoneNumber));
+    }
+
+    const q = constraints.length > 1 
+      ? query(collection(db, 'bookings'), or(...constraints))
+      : query(collection(db, 'bookings'), ...constraints);
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));

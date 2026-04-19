@@ -90,8 +90,9 @@ export default function AdminDashboard() {
     setIsPrinting(true);
     try {
       const element = document.getElementById(`print-ticket-${booking.id}`);
-      if (!element) return;
+      if (!element || !element.style) return;
       
+      const originalDisplay = element.style.display;
       element.style.display = 'block';
       const canvas = await html2canvas(element, {
         scale: 2,
@@ -114,10 +115,10 @@ export default function AdminDashboard() {
               --color-stone-600: #57534e !important;
             }
           `;
-          clonedDoc.head.appendChild(style);
+          clonedDoc.head?.appendChild(style);
         }
       });
-      element.style.display = 'none';
+      element.style.display = originalDisplay || 'none';
       
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
