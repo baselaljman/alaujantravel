@@ -4,7 +4,7 @@ import { Bus, User, MapPin, Package, LayoutDashboard, LogOut, Bell, X, Menu } fr
 import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { initializePushNotifications } from '../services/notificationService';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, where, or } from 'firebase/firestore';
 import { db } from '../firebase';
 import { App } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -53,8 +53,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
+    const constraints = [
+      where('type', '==', 'all'),
+      where('targetId', '==', user.uid)
+    ];
+
+    if (profile?.role === 'driver') {
+      constraints.push(where('type', '==', 'drivers'));
+    } else if (profile?.role === 'user') {
+      constraints.push(where('type', '==', 'users'));
+    }
+
     const q = query(
       collection(db, 'notifications'),
+      or(...constraints),
       orderBy('sentAt', 'desc'),
       limit(1)
     );

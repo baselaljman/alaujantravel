@@ -18,9 +18,13 @@ service cloud.firestore {
       return isSignedIn() && 'email' in request.auth.token ? request.auth.token.email : null;
     }
 
+    function userPhone() {
+      return isSignedIn() && 'phone_number' in request.auth.token ? request.auth.token.phone_number : null;
+    }
+
     function isAdmin() {
       return isSignedIn() && (
-        userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"] ||
+        (userEmail() != null && userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"]) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
@@ -69,13 +73,13 @@ service cloud.firestore {
     // --- Bookings ---
     match /bookings/{bookingId} {
       allow read: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid) ||
+        (userEmail() != null && resource.data.get('passengerEmail', '') == userEmail()) ||
+        (userPhone() != null && resource.data.get('passengerPhone', '') == userPhone()) ||
         isAdmin() || 
         hasPermission('view_bookings') || 
         hasPermission('driver') ||
-        hasPermission('staff') ||
-        (resource.data.userId == request.auth.uid) ||
-        (userEmail() != null && resource.data.get('passengerEmail', '') == userEmail()) ||
-        ('phone_number' in request.auth.token && resource.data.get('passengerPhone', '') == request.auth.token.phone_number)
+        hasPermission('staff')
       );
       
       allow create: if isSignedIn();
@@ -103,7 +107,14 @@ service cloud.firestore {
 
     // --- Notifications ---
     match /notifications/{id} { 
-      allow read: if isSignedIn() && (isAdmin() || resource.data.targetId == request.auth.uid || resource.data.type == 'all');
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        hasPermission('staff') ||
+        resource.data.get('targetId', '') == request.auth.uid || 
+        resource.data.get('type', '') == 'all' ||
+        resource.data.get('type', '') == 'users' ||
+        resource.data.get('type', '') == 'drivers'
+      );
       allow write: if isAdmin();
     }
     
