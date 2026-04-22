@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "598775315117",
+    "firebase_url": "https://gen-lang-client-0226720471-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "gen-lang-client-0226720471",
+    "storage_bucket": "gen-lang-client-0226720471.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:598775315117:android:06e82f6c40c67899ea6424",
+        "android_client_info": {
+          "package_name": "com.aloujan.bus"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "598775315117-fofik8tu6256n2nht1d5fd3gciopfjn8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aloujan.bus",
+            "certificate_hash": "dfae40ff0aed034a5e8d1e776aa167e7402d9b12"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7l3ead3hOF70jIYRPxDuaw1lgI2cfiuo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

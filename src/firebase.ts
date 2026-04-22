@@ -16,7 +16,8 @@ if (typeof window !== 'undefined') {
 
 // Initialize App Check with reCAPTCHA Enterprise
 if (typeof window !== 'undefined') {
-  const RECAPTCHA_SITE_KEY = '6Lf7Z78sAAAAAHh4tiZJE6-C6dkx9YmrAcA0O0oy';
+  // Use the verified Android key from your console
+  const RECAPTCHA_SITE_KEY = '6LdXHsAsAAAAANXn2_p2Qi5BCuwgJEcpsFC_z6tX';
   
   initializeAppCheck(app, {
     provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),

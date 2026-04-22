@@ -67,7 +67,8 @@ service cloud.firestore {
     // --- Trips ---
     match /trips/{tripId} {
       allow read: if true;
-      allow write: if isAdmin() || hasPermission('manage_trips');
+      allow update: if (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['availableSeats', 'bookedSeats'])) || isAdmin() || hasPermission('manage_trips');
+      allow create, delete: if isAdmin() || hasPermission('manage_trips');
     }
 
     // --- Bookings ---

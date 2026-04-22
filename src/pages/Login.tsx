@@ -114,8 +114,10 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     try {
-      await login();
-      navigate('/');
+      const success = await login();
+      if (success) {
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.message || 'حدث خطأ ما');
     }
@@ -179,9 +181,12 @@ export default function Login() {
                     <Phone className="absolute left-3 top-3 text-stone-400" size={18} />
                     <input
                       type="tel"
-                      placeholder="5xxxxxxxxx"
+                      placeholder="05xxxxxxxx"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setPhone(val.startsWith('0') ? val.substring(1) : val);
+                      }}
                       required
                       dir="ltr"
                       className="w-full bg-stone-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-left"

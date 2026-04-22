@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query, where, addDoc, doc, updateDoc, getDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { Trip, Booking, City } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useCurrency } from '../hooks/useCurrency';
@@ -9,10 +8,11 @@ import { Calendar, Users, CheckCircle, Download, Globe, Moon } from 'lucide-reac
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 
+import { Capacitor } from '@capacitor/core';
 import { useSearchParams } from 'react-router-dom';
 
 export default function BookingPage() {
-  const { user, profile, login } = useAuth();
+  const { user, profile, login, signInWithPhone, verifyOtp } = useAuth();
   const { formatPrice } = useCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -25,14 +25,24 @@ export default function BookingPage() {
   const [contactPhone, setContactPhone] = useState('');
   const [countryCode, setCountryCode] = useState('+966');
   const [otpCode, setOtpCode] = useState('');
-  const [verificationId, setVerificationId] = useState<ConfirmationResult | null>(null);
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+
+  useEffect(() => {
+    if (user?.phoneNumber) {
+      setIsPhoneVerified(true);
+      setContactPhone(user.phoneNumber.replace(/^\+966|^\+963/, '').replace(/^0+/, ''));
+      setCountryCode(user.phoneNumber.startsWith('+963') ? '+963' : '+966');
+    }
+    if (profile?.email) {
+      setContactEmail(profile.email);
+    }
+  }, [user, profile]);
+
   const [contactEmail, setContactEmail] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'later'>('later');
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<Booking[]>([]);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   const formatDateArabic = (dateStr: string) => {
     try {
@@ -227,150 +237,35 @@ export default function BookingPage() {
     setStep('contact');
   };
 
-  const setupRecaptcha = () => {
-    try {
-      const container = document.getElementById('recaptcha-container');
-      if (!container) return;
-
-      // If already initialized and container has content, don't re-initialize
-      if (recaptchaVerifierRef.current && container.innerHTML !== '') {
-        return;
-      }
-
-      // Clear container and reference
-      if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear();
-        } catch (e) {}
-        recaptchaVerifierRef.current = null;
-      }
-      container.innerHTML = '';
-
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'normal',
-        callback: () => {
-          console.log('Recaptcha verified');
-        },
-        'expired-callback': () => {
-          console.log('Recaptcha expired');
-          setupRecaptcha();
-        }
-      });
-
-      recaptchaVerifierRef.current.render().catch(err => {
-        console.error("Error rendering reCAPTCHA:", err);
-      });
-    } catch (err) {
-      console.error("Recaptcha setup error:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (step === 'contact' && !isPhoneVerified) {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        setupRecaptcha();
-      }, 100);
-      
-      return () => {
-        clearTimeout(timer);
-        // We don't necessarily want to clear it on every re-render of the component
-        // but we should clear it if we leave the contact step
-      };
-    }
-  }, [step, isPhoneVerified]);
-
   const sendOTP = async () => {
     if (!contactPhone) return;
     
-    // Ensure recaptcha is ready
-    if (!recaptchaVerifierRef.current) {
-      setupRecaptcha();
-    }
-
     setLoading(true);
     try {
       const phoneNumber = `${countryCode}${contactPhone.replace(/^0+/, '')}`;
-      const appVerifier = recaptchaVerifierRef.current;
-      
-      if (!appVerifier) {
-        throw new Error("فشل تهيئة أداة التحقق. يرجى تحديث الصفحة.");
-      }
-
-      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-      setVerificationId(confirmationResult);
+      await signInWithPhone(phoneNumber, 'recaptcha-container');
       setOtpSent(true);
       alert('تم إرسال رمز التحقق إلى هاتفك');
     } catch (error: any) {
       console.error("OTP Error:", error);
-      
-      // If it's the "already rendered" error, we try to recover
-      if (error.message?.includes('already been rendered')) {
-        setupRecaptcha();
-        alert('حدث خطأ في أداة التحقق، يرجى المحاولة مرة أخرى.');
-      } else {
-        alert(`حدث خطأ أثناء إرسال الرمز: ${error.message || 'يرجى التأكد من صحة الرقم.'}`);
-      }
-      
-      // Reset recaptcha on error
-      if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear();
-        } catch (e) {}
-        recaptchaVerifierRef.current = null;
-        setupRecaptcha();
-      }
+      alert(error.message || 'حدث خطأ أثناء إرسال الرمز');
     } finally {
       setLoading(false);
     }
   };
 
   const verifyOTP = async () => {
-    if (!otpCode || !verificationId) return;
+    if (!otpCode) return;
     setLoading(true);
     try {
-      await verificationId.confirm(otpCode);
-      setIsPhoneVerified(true);
+      await verifyOtp(otpCode);
       alert('تم التحقق من رقم الهاتف بنجاح');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Verification Error:", error);
-      alert('رمز التحقق غير صحيح');
+      alert(error.message || 'رمز التحقق غير صحيح');
     } finally {
       setLoading(false);
     }
-  };
-
-  const downloadTicket = async () => {
-    const element = document.getElementById('ticket-preview');
-    if (!element) return;
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      onclone: (clonedDoc) => {
-        // Remove all existing stylesheets to prevent oklch parsing errors
-        const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
-        styles.forEach(s => s.remove());
-
-        const style = clonedDoc.createElement('style');
-        style.innerHTML = `
-          :root {
-            --color-emerald-500: #10b981 !important;
-            --color-emerald-600: #059669 !important;
-            --color-emerald-700: #047857 !important;
-            --color-stone-100: #f5f5f4 !important;
-            --color-stone-400: #a8a29e !important;
-            --color-stone-500: #78716c !important;
-            --color-stone-600: #57534e !important;
-          }
-        `;
-        clonedDoc.head.appendChild(style);
-      }
-    });
-    const link = document.createElement('a');
-    link.download = `ticket-${bookingSuccess[0]?.id || 'booking'}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
   };
 
   return (
@@ -578,95 +473,108 @@ export default function BookingPage() {
               <div className="space-y-2">
                 <label className="text-xs text-stone-500">رقم الهاتف</label>
                 <div className="flex gap-2">
+                  <input 
+                    type="tel" 
+                    placeholder="05xxxxxxxx" 
+                    value={contactPhone}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setContactPhone(val.startsWith('0') ? val.substring(1) : val);
+                    }}
+                    className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-left"
+                    dir="ltr"
+                  />
                   <select 
                     value={countryCode} 
                     onChange={(e) => setCountryCode(e.target.value)}
-                    className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none min-w-[120px]"
                   >
-                    <option value="+966">🇸🇦 +966</option>
-                    <option value="+963">🇸🇾 +963</option>
+                    <option value="+966">السعودية 🇸🇦</option>
+                    <option value="+971">الإمارات 🇦🇪</option>
+                    <option value="+965">الكويت 🇰🇼</option>
+                    <option value="+974">قطر 🇶🇦</option>
+                    <option value="+973">البحرين 🇧🇭</option>
+                    <option value="+968">عمان 🇴🇲</option>
+                    <option value="+962">الأردن 🇯🇴</option>
+                    <option value="+961">لبنان 🇱🇧</option>
+                    <option value="+963">سوريا 🇸🇾</option>
+                    <option value="+964">العراق 🇮🇶</option>
+                    <option value="+967">اليمن 🇾🇪</option>
                   </select>
-                  <input 
-                    type="tel" 
-                    placeholder="رقم الهاتف" 
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
                 </div>
               </div>
 
-              {/* OTP section disabled for now as per user request */}
-              {/* 
+              {/* OTP section for verification */}
               {!otpSent && !isPhoneVerified && (
                 <button 
                   onClick={sendOTP}
                   disabled={!contactPhone || loading}
-                  className="text-xs text-emerald-600 font-bold hover:underline disabled:opacity-50"
+                  className="w-full bg-emerald-50 text-emerald-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                 >
-                  إرسال رمز التحقق (OTP)
+                  {loading ? 'جاري الإرسال...' : 'إرسال رمز التحقق (OTP)'}
                 </button>
               )}
-              */}
 
               {otpSent && !isPhoneVerified && (
-                <div className="space-y-2 p-4 bg-stone-50 rounded-2xl border border-stone-100">
-                  <label className="text-xs text-stone-500">أدخل رمز التحقق</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="رمز التحقق" 
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
+                <div className="space-y-4 p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                  <div className="space-y-2">
+                    <label className="text-xs text-stone-500">أدخل رمز التحقق المرسل لهاتفك</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        maxLength={6}
+                        placeholder="000000" 
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                        className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-3 text-center text-xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                      <button 
+                        onClick={verifyOTP}
+                        disabled={otpCode.length < 6 || loading}
+                        className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                      >
+                        {loading ? '...' : 'تأكيد'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center px-1">
                     <button 
-                      onClick={verifyOTP}
-                      disabled={!otpCode || loading}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                      onClick={sendOTP}
+                      className="text-xs text-stone-400 hover:text-emerald-600 underline"
                     >
-                      تحقق
+                      إعادة إرسال الرمز؟
+                    </button>
+                    <button 
+                      onClick={() => { setOtpSent(false); setOtpCode(''); }}
+                      className="text-xs text-stone-400 hover:text-red-500"
+                    >
+                      تغيير الرقم
                     </button>
                   </div>
-                  <button 
-                    onClick={sendOTP}
-                    className="text-[10px] text-stone-400 hover:text-emerald-600"
-                  >
-                    إعادة إرسال الرمز؟
-                  </button>
                 </div>
               )}
 
               {isPhoneVerified && (
-                <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold bg-emerald-50 p-3 rounded-xl">
-                  <CheckCircle size={16} />
-                  تم التحقق من رقم الهاتف
+                <div className="flex items-center gap-3 text-emerald-700 font-bold bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                  <div className="bg-emerald-500 text-white rounded-full p-1">
+                    <CheckCircle size={16} />
+                  </div>
+                  <span>تم التحقق من رقم الهاتف بنجاح</span>
                 </div>
               )}
 
-              <div id="recaptcha-container" className="flex justify-center my-4 min-h-[78px]"></div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-stone-500">البريد الإلكتروني</label>
-                <input 
-                  type="email" 
-                  placeholder="البريد الإلكتروني" 
-                  value={contactEmail || (user?.email || '')}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
+              <div id="recaptcha-container" className="flex justify-center my-2 min-h-[78px]"></div>
             </div>
-            <div className="bg-emerald-50 p-4 rounded-2xl space-y-2 text-sm">
+            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100/50 space-y-2 text-sm">
               <div className="flex justify-between"><span>عدد المقاعد:</span><span className="font-bold">{selectedSeats.length}</span></div>
               <div className="flex justify-between"><span>المبلغ الإجمالي:</span><span className="font-black text-emerald-600">{formatPrice(getTripPrice(selectedTrip).value * selectedSeats.length)}</span></div>
             </div>
             <button 
-              disabled={!contactPhone}
+              disabled={!isPhoneVerified || loading}
               onClick={() => setStep('payment')}
-              className="btn-primary w-full disabled:opacity-50"
+              className="btn-primary w-full disabled:opacity-50 py-4 text-lg"
             >
-              التالي: الدفع الإلكتروني
+              التالي: تأكيد وعملية الدفع
             </button>
           </div>
         </div>
@@ -834,7 +742,7 @@ export default function BookingPage() {
                           --color-stone-600: #57534e !important;
                         }
                       `;
-                      clonedDoc.head.appendChild(style);
+                      clonedDoc.head?.appendChild(style);
                     }
                   });
                   const link = document.createElement('a');

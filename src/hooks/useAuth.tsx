@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
-  login: () => Promise<void>;
+  login: () => Promise<boolean>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [verificationId, setVerificationId] = useState<string | null>(null);
+  const [pendingPhoneNumber, setPendingPhoneNumber] = useState<string | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -111,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = async () => {
+  const login = async (): Promise<boolean> => {
     try {
       if (Capacitor.isNativePlatform()) {
         const result = await FirebaseAuthentication.signInWithGoogle();
@@ -122,8 +123,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         await signInWithPopup(auth, googleProvider);
       }
-    } catch (error) {
+      return true;
+    } catch (error: any) {
       console.error('Login Error:', error);
+      
+      // Handle human-friendly messages for common errors
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        // Return false instead of throwing to indicate a silent cancellation
+        return false;
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('تم حظر النافذة المنبثقة بواسطة المتصفح. يرجى السماح بالنوافذ المنبثقة لهذا الموقع لتتمكن من تسجيل الدخول.');
+      }
+      
       throw error;
     }
   };
@@ -154,19 +165,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithPhone = async (phoneNumber: string, recaptchaContainerId?: string) => {
     try {
+      setPendingPhoneNumber(phoneNumber);
       if (Capacitor.isNativePlatform()) {
-        console.log('Starting native phone sign-in for:', phoneNumber);
-        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
+        console.log('Attempting Native Phone Auth for:', phoneNumber);
+        
+        // Ensure we clear any old verification IDs and pending numbers
+        setVerificationId(null);
+
+        // Standard native phone auth using the capacitor plugin
+        // The -39 error is usually a Firebase configuration issue (Identity Platform/App Check)
+        const listener = await FirebaseAuthentication.addListener('phoneCodeSent', (event: any) => {
+          console.log('Native phoneCodeSent event (ID captured):', event.verificationId);
+          if (event.verificationId) {
+            setVerificationId(event.verificationId);
+          }
+          listener.remove();
+        });
+
+        const errorListener = await FirebaseAuthentication.addListener('phoneVerificationFailed', (event: any) => {
+          console.error('Native phoneVerificationFailed event:', event);
+          let userMessage = 'فشل إرسال الكود: ' + (event.message || 'خطأ غير معروف.');
+          
+          if (event.message?.includes('39') || event.message?.includes('INTERNAL_ERROR')) {
+            userMessage = 'خطأ فني (-39): يجب تفعيل "Identity Platform" و "App Check" في Firebase.';
+          } else if (event.message?.includes('17028') || event.message?.includes('not authorized')) {
+            userMessage = 'خطأ في هوية التطبيق (17028): بصمة SHA-256 غير متطابقة أو Play Integrity API غير مفعّل في Google Cloud.';
+          }
+          
+          alert(userMessage);
+          errorListener.remove();
+        });
+
+        await FirebaseAuthentication.signInWithPhoneNumber({
           phoneNumber,
         });
-        
-        console.log('Native phone sign-in result:', result);
-        
-        if (result && result.verificationId) {
-          setVerificationId(result.verificationId);
-        } else {
-          throw new Error('فشل الحصول على رمز التحقق من النظام. تأكد من إعدادات SHA-256 في Firebase.');
-        }
       } else {
         if (!recaptchaContainerId) throw new Error('Recaptcha container ID is required for web');
         
@@ -204,12 +236,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const errorCode = error.code || '';
       const errorMessage = error.message || String(error);
       
-      if (errorMessage.includes('unauthorized-domain')) {
+      if (errorMessage.includes('not authorized') || errorMessage.includes('17028')) {
+        throw new Error('هذا التطبيق غير مصرح له باستخدام Firebase. يرجى التأكد من إضافة بصمات SHA-1 و SHA-256 ومطابقة الـ Package Name في Firebase Console.');
+      } else if (errorMessage.includes('unauthorized-domain')) {
         throw new Error('هذا النطاق غير مصرح به في Firebase Console.');
       } else if (errorMessage.includes('invalid-phone-number')) {
         throw new Error('رقم الهاتف المدخل غير صحيح.');
       } else if (errorMessage.includes('-39') || errorCode.includes('internal-error')) {
-        throw new Error('عذراً، فشل نظام الحماية في التحقق. تأكد من تفعيل "Identity Platform" و "App Check" في Firebase Console بشكل كامل وربطهما بمفتاح reCAPTCHA Enterprise الصحيح.');
+        throw new Error('خطأ في إعدادات نظام الحماية (Error -39). تأكد من: 1- تفعيل Identity Platform. 2- إضافة SHA-256. 3- إضافة الـ Debug Token الموضح في سجل Logcat إلى Firebase Console.');
       }
       
       throw new Error(errorMessage);
@@ -221,30 +255,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (Capacitor.isNativePlatform()) {
         if (!verificationId) throw new Error('لم يتم العثور على رمز التحقق الأصلي.');
         
-        console.log('Verifying native OTP:', otp);
-        const result: any = await FirebaseAuthentication.signInWithPhoneNumber({
-          verificationId,
-          verificationCode: otp,
-        } as any);
-
-        console.log('Verification result:', result);
-
-        if (result && result.credential) {
-          // Sync with web SDK auth state
-          const credential = PhoneAuthProvider.credential(
-            result.credential.verificationId || verificationId,
-            result.credential.verificationCode || otp
-          );
-          await signInWithCredential(auth, credential);
-        } else if (result && !result.credential) {
-             console.warn('Login successful but no credential returned from native plugin');
-        }
+        console.log('Verifying native OTP using hybrid approach:', otp);
+        
+        // Strategy: Use the Web SDK to verify the credential using the ID from the native layer.
+        // This ensures the JS auth state (onAuthStateChanged) is correctly updated.
+        const credential = PhoneAuthProvider.credential(verificationId, otp);
+        const userCredential = await signInWithCredential(auth, credential);
+        
+        console.log('Hybrid Verification Success. UID:', userCredential.user.uid);
       } else {
         if (!confirmationResult) throw new Error('Confirmation result not found');
         await confirmationResult.confirm(otp);
       }
     } catch (error: any) {
-      console.error('OTP Verification Error:', error);
+      console.error('OTP Verification Error (Full):', error);
+      const errorMessage = error.message || '';
+      
+      if (errorMessage.includes('invalid-verification-code')) {
+        throw new Error('كود التحقق غير صحيح.');
+      } else if (errorMessage.includes('session-expired')) {
+        throw new Error('انتهت صلاحية الجلسة، اطلب كوداً جديداً.');
+      }
+      
       throw new Error('كود التحقق غير صحيح أو انتهت صلاحيته.');
     }
   };
