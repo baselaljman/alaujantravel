@@ -38,39 +38,63 @@ if (admin.apps.length === 0) {
   } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
       let saRaw = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+      console.log("Firebase Admin: FIREBASE_SERVICE_ACCOUNT found. Length:", saRaw.length);
       
-      // Clean up potential formatting issues from copy-paste
-      // Handle cases where the whole thing is wrapped in extra quotes
+      // Handle surrounding quotes
       if (saRaw.startsWith("'") && saRaw.endsWith("'")) saRaw = saRaw.slice(1, -1);
       if (saRaw.startsWith('"') && saRaw.endsWith('"')) saRaw = saRaw.slice(1, -1);
       
-      // If it looks like escaped JSON (e.g. \"project_id\"), unescape it
-      if (saRaw.includes('\\"')) {
-        saRaw = saRaw.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+      let serviceAccount;
+      try {
+        serviceAccount = JSON.parse(saRaw);
+      } catch (parseError: any) {
+        console.error("Firebase Admin: Initial JSON parse failed. Attempting cleanup...");
+        const cleanerRaw = saRaw.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+        try {
+          serviceAccount = JSON.parse(cleanerRaw);
+        } catch (e2: any) {
+          console.error("Firebase Admin: RE-PARSE FAILED:", e2.message);
+          throw e2;
+        }
       }
-
-      const serviceAccount = JSON.parse(saRaw);
       
-      if (!serviceAccount.private_key || !serviceAccount.client_email) {
-        console.error("Firebase Admin: CRITICAL - The provided JSON is missing 'private_key' or 'client_email'.");
-        console.error("It looks like you might have pasted a 'Web Config' instead of a 'Service Account' JSON.");
-        console.error("Please go to Project Settings > Service Accounts > Generate new private key in Firebase Console.");
-      }
-
-      console.log(`Firebase Admin: Parsed service account for project: ${serviceAccount.project_id}`);
+      console.log(`Firebase Admin: Parsed JSON for project: ${serviceAccount.project_id}`);
       
-      if (serviceAccount.project_id !== firebaseConfig.projectId) {
-        console.warn(`Firebase Admin: PROJECT ID MISMATCH! Config: ${firebaseConfig.projectId}, SA: ${serviceAccount.project_id}`);
+      // DEEP CLEAN PRIVATE KEY
+      if (serviceAccount.private_key && typeof serviceAccount.private_key === 'string') {
+        let pKey = serviceAccount.private_key.trim();
+        
+        // Remove surrounding quotes if any
+        if (pKey.startsWith('"') && pKey.endsWith('"')) pKey = pKey.slice(1, -1);
+        if (pKey.startsWith("'") && pKey.endsWith("'")) pKey = pKey.slice(1, -1);
+        
+        // Fix double escaping of newlines
+        pKey = pKey.replace(/\\n/g, '\n');
+        
+        // Ensure it uses unix newlines solely
+        pKey = pKey.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        // Ensure it has the correct headers
+        if (!pKey.includes("-----BEGIN PRIVATE KEY-----")) {
+          console.error("Firebase Admin: Private key is missing BEGIN header!");
+        }
+        
+        serviceAccount.private_key = pKey;
+        console.log(`Firebase Admin: Private key cleaned (length: ${pKey.length}). Lines: ${pKey.split('\n').length}`);
+      } else {
+        console.error("Firebase Admin: NO PRIVATE KEY FOUND IN JSON!");
       }
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`
+        databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
       });
-      console.log("Firebase Admin: Initialized using FIREBASE_SERVICE_ACCOUNT environment variable.");
+      console.log("Firebase Admin: app.initializeApp called successfully.");
     } catch (e: any) {
-      console.error("Firebase Admin: CRITICAL ERROR parsing FIREBASE_SERVICE_ACCOUNT:", e.message);
-      // Fallback but it will likely fail later
+      console.error("Firebase Admin: FATAL INITIALIZATION ERROR:", e.message);
+      if (e.message.includes("Unexpected token")) {
+        console.error("Diagnostic: The JSON is likely corrupted or has invisible characters.");
+      }
       admin.initializeApp({ projectId: firebaseConfig.projectId });
     }
   } else {
@@ -80,6 +104,15 @@ if (admin.apps.length === 0) {
     });
   }
 }
+
+let dbInstance: admin.firestore.Firestore | null = null;
+const getDb = () => {
+  if (!dbInstance) {
+    if (!admin.apps.length) throw new Error("Firebase Admin not initialized");
+    dbInstance = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
+  }
+  return dbInstance;
+};
 
 // Global connectivity status
 let firebaseStatus = {
@@ -91,7 +124,7 @@ let firebaseStatus = {
 // Test connectivity immediately and periodically
 const testDbAccess = async () => {
   try {
-    const db = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
+    const db = getDb();
     await db.collection('_health_check').doc('ping').set({ 
       time: new Date(),
       note: "Server startup check" 
@@ -117,10 +150,45 @@ async function startServer() {
 
   // Health check for Firebase Admin
   app.get("/api/notification-status", (req, res) => {
+    const sa = process.env.FIREBASE_SERVICE_ACCOUNT || "";
+    let saJsonStatus = "missing";
+    let saProjectId = null;
+    
+    if (sa) {
+      try {
+        let cleanSa = sa.trim();
+        if (cleanSa.startsWith("'") || cleanSa.startsWith('"')) cleanSa = cleanSa.slice(1, -1);
+        const parsed = JSON.parse(cleanSa);
+        saJsonStatus = "valid_json";
+        saProjectId = parsed.project_id;
+        
+        const pk = parsed.private_key || "";
+        const pkClean = pk.replace(/\\n/g, '\n').trim();
+        
+        (req as any).saInfo = {
+          saType: parsed.type,
+          pKeyLength: pk.length,
+          pKeyLines: pkClean.split('\n').length,
+          hasBegin: pkClean.includes("BEGIN PRIVATE KEY"),
+          hasEnd: pkClean.includes("END PRIVATE KEY")
+        };
+      } catch (e) {
+        saJsonStatus = "invalid_json";
+      }
+    }
+
     res.json({ 
       initialized: admin.apps.length > 0,
       projectId: firebaseConfig.projectId,
-      firebaseStatus: firebaseStatus // Added detailed status
+      firebaseStatus: firebaseStatus,
+      diagnostics: {
+        saLength: sa.length,
+        saJsonStatus,
+        saProjectId,
+        projectIdMatch: saProjectId === firebaseConfig.projectId,
+        nodeEnv: process.env.NODE_ENV,
+        ...(req as any).saInfo
+      }
     });
   });
 
@@ -194,9 +262,7 @@ async function startServer() {
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       
       // Store in Firestore with 5-minute expiry
-      if (!admin.apps.length) throw new Error("Firebase Admin not initialized");
-      
-      const db = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
+      const db = getDb();
       
       try {
         await db.collection('sms_otps').doc(phoneNumber).set({
@@ -207,8 +273,8 @@ async function startServer() {
         console.error("Firestore Error in /api/auth/otp/send:", firestoreError);
         if (firestoreError.message?.includes('16') || firestoreError.message?.includes('UNAUTHENTICATED')) {
           return res.status(500).json({ 
-            error: "فشل المصادقة مع قاعدة البيانات. يرجى التأكد من إضافة FIREBASE_SERVICE_ACCOUNT في إعدادات التطبيق (Secrets).",
-            details: firestoreError.message 
+            error: "فشل المصادقة مع Firebase (خطأ 16).",
+            details: "يحدث هذا عادةً لأن ملف مفتاح الخدمة (Service Account) غير صحيح، أو أنه يخص مشروعاً آخر، أو أنه تم نسخه بشكل خاطئ. يرجى التأكد من الحصول على المفتاح من: Firebase Console > Project Settings > Service Accounts > Generate New Private Key."
           });
         }
         throw firestoreError;
@@ -241,8 +307,7 @@ async function startServer() {
     }
 
     try {
-      if (!admin.apps.length) throw new Error("Firebase Admin not initialized");
-      const db = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
+      const db = getDb();
       
       let otpDoc;
       try {
@@ -251,8 +316,8 @@ async function startServer() {
         console.error("Firestore Error in /api/auth/otp/verify:", firestoreError);
         if (firestoreError.message?.includes('16') || firestoreError.message?.includes('UNAUTHENTICATED')) {
           return res.status(500).json({ 
-            error: "فشل المصادقة مع قاعدة البيانات. يرجى التأكد من إضافة FIREBASE_SERVICE_ACCOUNT في إعدادات التطبيق (Secrets).",
-            details: firestoreError.message 
+            error: "فشل المصادقة مع Firebase (خطأ 16).",
+            details: "يحدث هذا عادةً لأن ملف مفتاح الخدمة (Service Account) غير صحيح، أو أنه يخص مشروعاً آخر، أو أنه تم نسخه بشكل خاطئ. يرجى التأكد من الحصول على المفتاح من: Firebase Console > Project Settings > Service Accounts > Generate New Private Key."
           });
         }
         throw firestoreError;
