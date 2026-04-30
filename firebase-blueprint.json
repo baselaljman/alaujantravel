@@ -146,6 +146,16 @@
         "sentBy": { "type": "string", "description": "Admin ID who sent the notification" }
       },
       "required": ["title", "body", "type", "sentAt", "sentBy"]
+    },
+    "SmsOtp": {
+      "title": "SMS OTP",
+      "description": "Temporary storage for SMS verification codes",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "The 6-digit verification code" },
+        "expiresAt": { "type": "string", "format": "date-time", "description": "Expiration timestamp" }
+      },
+      "required": ["code", "expiresAt"]
     }
   },
   "firestore": {
@@ -188,6 +198,10 @@
     "/notifications": {
       "schema": "Notification",
       "description": "History of sent notifications"
+    },
+    "/sms_otps": {
+      "schema": "SmsOtp",
+      "description": "Temporary storage for phone verification codes"
     }
   }
 }

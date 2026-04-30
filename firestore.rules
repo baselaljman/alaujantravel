@@ -125,6 +125,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // --- SMS OTPs (Server-side handled, client denied for security) ---
+    match /sms_otps/{id} {
+      allow read, write: if false;
+    }
+
     // -----------------------------------------------------------------
     // 3. Catch-all: Deny everything by default
     // -----------------------------------------------------------------

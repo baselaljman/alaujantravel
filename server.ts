@@ -3,8 +3,14 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import admin from "firebase-admin";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import bodyParser from "body-parser";
 import fs from "fs";
+import axios from "axios";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,38 +20,94 @@ const configPath = path.join(process.cwd(), "firebase-applet-config.json");
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
 // Initialize Firebase Admin
-// Note: For push notifications to work, the user must provide a service account JSON
-// as an environment variable FIREBASE_SERVICE_ACCOUNT or place it in service-account.json
-const serviceAccountPath = path.join(process.cwd(), "service-account.json");
-if (fs.existsSync(serviceAccountPath)) {
-  const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf-8"));
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`
-  });
-  console.log("Firebase Admin initialized with service account file.");
-} else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  try {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`
-    });
-    console.log("Firebase Admin initialized with environment variable.");
-  } catch (e) {
-    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT env var:", e);
-  }
-} else {
-  // Fallback to default credentials (works on Google Cloud)
-  try {
+if (admin.apps.length === 0) {
+  console.log("Firebase Admin: Attempting initialization...");
+  const serviceAccountPath = path.join(process.cwd(), "service-account.json");
+  
+  if (fs.existsSync(serviceAccountPath)) {
+    try {
+      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf-8"));
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`
+      });
+      console.log("Firebase Admin: Initialized using service-account.json file.");
+    } catch (err) {
+      console.error("Firebase Admin: Error reading service-account.json:", err);
+    }
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      let saRaw = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+      
+      // Clean up potential formatting issues from copy-paste
+      // Handle cases where the whole thing is wrapped in extra quotes
+      if (saRaw.startsWith("'") && saRaw.endsWith("'")) saRaw = saRaw.slice(1, -1);
+      if (saRaw.startsWith('"') && saRaw.endsWith('"')) saRaw = saRaw.slice(1, -1);
+      
+      // If it looks like escaped JSON (e.g. \"project_id\"), unescape it
+      if (saRaw.includes('\\"')) {
+        saRaw = saRaw.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+      }
+
+      const serviceAccount = JSON.parse(saRaw);
+      
+      if (!serviceAccount.private_key || !serviceAccount.client_email) {
+        console.error("Firebase Admin: CRITICAL - The provided JSON is missing 'private_key' or 'client_email'.");
+        console.error("It looks like you might have pasted a 'Web Config' instead of a 'Service Account' JSON.");
+        console.error("Please go to Project Settings > Service Accounts > Generate new private key in Firebase Console.");
+      }
+
+      console.log(`Firebase Admin: Parsed service account for project: ${serviceAccount.project_id}`);
+      
+      if (serviceAccount.project_id !== firebaseConfig.projectId) {
+        console.warn(`Firebase Admin: PROJECT ID MISMATCH! Config: ${firebaseConfig.projectId}, SA: ${serviceAccount.project_id}`);
+      }
+
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`
+      });
+      console.log("Firebase Admin: Initialized using FIREBASE_SERVICE_ACCOUNT environment variable.");
+    } catch (e: any) {
+      console.error("Firebase Admin: CRITICAL ERROR parsing FIREBASE_SERVICE_ACCOUNT:", e.message);
+      // Fallback but it will likely fail later
+      admin.initializeApp({ projectId: firebaseConfig.projectId });
+    }
+  } else {
+    console.warn("Firebase Admin: No service account found. Falling back to default credentials (may fail).");
     admin.initializeApp({
       projectId: firebaseConfig.projectId
     });
-    console.log("Firebase Admin initialized with default credentials.");
-  } catch (e) {
-    console.warn("Firebase Admin failed to initialize. Push notifications will not work until a service account is provided.");
   }
 }
+
+// Global connectivity status
+let firebaseStatus = {
+  connected: false,
+  error: null as string | null,
+  lastChecked: null as Date | null
+};
+
+// Test connectivity immediately and periodically
+const testDbAccess = async () => {
+  try {
+    const db = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
+    await db.collection('_health_check').doc('ping').set({ 
+      time: new Date(),
+      note: "Server startup check" 
+    });
+    firebaseStatus = { connected: true, error: null, lastChecked: new Date() };
+    console.log("Firebase Admin: Firestore connectivity test SUCCESSFUL.");
+  } catch (err: any) {
+    firebaseStatus = { connected: false, error: err.message, lastChecked: new Date() };
+    console.error("Firebase Admin: Firestore connectivity test FAILED!");
+    console.error(`Error Code: ${err.code}, Message: ${err.message}`);
+  }
+};
+testDbAccess();
+
+// UniMatrix Configuration
+const UNIMATRIX_ACCESS_KEY = process.env.UNIMATRIX_ACCESS_KEY || "";
 
 async function startServer() {
   const app = express();
@@ -57,7 +119,8 @@ async function startServer() {
   app.get("/api/notification-status", (req, res) => {
     res.json({ 
       initialized: admin.apps.length > 0,
-      projectId: firebaseConfig.projectId
+      projectId: firebaseConfig.projectId,
+      firebaseStatus: firebaseStatus // Added detailed status
     });
   });
 
@@ -110,6 +173,112 @@ async function startServer() {
       });
     } catch (error: any) {
       console.error("Error sending FCM message:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // OTP Routes (SMS via UniMatrix)
+  app.post("/api/auth/otp/send", async (req, res) => {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ error: "رقم الهاتف مطلوب" });
+    }
+
+    if (!UNIMATRIX_ACCESS_KEY) {
+      return res.status(500).json({ error: "إعدادات UniMatrix غير مكتملة (نقص مفتاح الوصول)" });
+    }
+
+    try {
+      // Generate a 6-digit code
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store in Firestore with 5-minute expiry
+      if (!admin.apps.length) throw new Error("Firebase Admin not initialized");
+      
+      const db = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
+      
+      try {
+        await db.collection('sms_otps').doc(phoneNumber).set({
+          code: otpCode,
+          expiresAt: Timestamp.fromMillis(Date.now() + 5 * 60 * 1000)
+        });
+      } catch (firestoreError: any) {
+        console.error("Firestore Error in /api/auth/otp/send:", firestoreError);
+        if (firestoreError.message?.includes('16') || firestoreError.message?.includes('UNAUTHENTICATED')) {
+          return res.status(500).json({ 
+            error: "فشل المصادقة مع قاعدة البيانات. يرجى التأكد من إضافة FIREBASE_SERVICE_ACCOUNT في إعدادات التطبيق (Secrets).",
+            details: firestoreError.message 
+          });
+        }
+        throw firestoreError;
+      }
+
+      // Send via UniMatrix API
+      // Documented at https://www.unimtx.com/docs/api/messaging/send-sms
+      const response = await axios.post(`https://api.unimtx.com/?action=send&accessKey=${UNIMATRIX_ACCESS_KEY}`, {
+        to: phoneNumber,
+        text: `كود التحقق الخاص بك هو: ${otpCode}. صالح لمدة 5 دقائق.`
+      });
+
+      if (response.data.code === '0' || response.data.status === 'success') {
+        res.json({ success: true, messageId: response.data.data?.messageId });
+      } else {
+        console.error("UniMatrix Error Response:", response.data);
+        res.status(500).json({ error: `فشل إرسال الرسالة: ${response.data.message || 'خطأ غير معروف'}` });
+      }
+    } catch (error: any) {
+      console.error("UniMatrix SMS Send Error:", error);
+      res.status(500).json({ error: error.message || "حدث خطأ أثناء إرسال الرسالة القصيرة" });
+    }
+  });
+
+  app.post("/api/auth/otp/verify", async (req, res) => {
+    const { phoneNumber, code } = req.body;
+
+    if (!phoneNumber || !code) {
+      return res.status(400).json({ error: "رقم الهاتف والكود مطلوبان" });
+    }
+
+    try {
+      if (!admin.apps.length) throw new Error("Firebase Admin not initialized");
+      const db = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
+      
+      let otpDoc;
+      try {
+        otpDoc = await db.collection('sms_otps').doc(phoneNumber).get();
+      } catch (firestoreError: any) {
+        console.error("Firestore Error in /api/auth/otp/verify:", firestoreError);
+        if (firestoreError.message?.includes('16') || firestoreError.message?.includes('UNAUTHENTICATED')) {
+          return res.status(500).json({ 
+            error: "فشل المصادقة مع قاعدة البيانات. يرجى التأكد من إضافة FIREBASE_SERVICE_ACCOUNT في إعدادات التطبيق (Secrets).",
+            details: firestoreError.message 
+          });
+        }
+        throw firestoreError;
+      }
+
+      if (!otpDoc.exists) {
+        return res.status(400).json({ error: "لم يتم إرسال كود لهذا الرقم أو انتهت صلاحيته" });
+      }
+
+      const otpData = otpDoc.data();
+      if (otpData?.expiresAt.toDate() < new Date()) {
+        await db.collection('sms_otps').doc(phoneNumber).delete();
+        return res.status(400).json({ error: "انتهت صلاحية الكود" });
+      }
+
+      if (otpData?.code === code) {
+        // Correct code - Authenticate user
+        const customToken = await admin.auth().createCustomToken(phoneNumber);
+        // Clear the OTP
+        await db.collection('sms_otps').doc(phoneNumber).delete();
+        res.json({ success: true, token: customToken });
+      } else {
+        res.status(400).json({ success: false, error: "كود التحقق غير صحيح" });
+      }
+    } catch (error: any) {
+      console.error("OTP Verify Error:", error);
       res.status(500).json({ error: error.message });
     }
   });

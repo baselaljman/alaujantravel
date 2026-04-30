@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider } from '../firebase';
+import { auth, db, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, signInWithCustomToken } from '../firebase';
 import { onAuthStateChanged, signInWithPopup, signOut, User, ConfirmationResult } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -15,6 +15,8 @@ interface AuthContextType {
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signInWithPhone: (phoneNumber: string, recaptchaContainerId?: string) => Promise<void>;
+  sendSmsOtp: (phoneNumber: string) => Promise<void>;
+  verifySmsOtp: (phoneNumber: string, code: string) => Promise<void>;
   verifyOtp: (otp: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -163,126 +165,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
-  const signInWithPhone = async (phoneNumber: string, recaptchaContainerId?: string) => {
+  const signInWithPhone = async (phoneNumber: string) => {
     try {
-      setPendingPhoneNumber(phoneNumber);
-      if (Capacitor.isNativePlatform()) {
-        console.log('Attempting Native Phone Auth for:', phoneNumber);
-        
-        // Ensure we clear any old verification IDs and pending numbers
-        setVerificationId(null);
-
-        // Standard native phone auth using the capacitor plugin
-        // The -39 error is usually a Firebase configuration issue (Identity Platform/App Check)
-        const listener = await FirebaseAuthentication.addListener('phoneCodeSent', (event: any) => {
-          console.log('Native phoneCodeSent event (ID captured):', event.verificationId);
-          if (event.verificationId) {
-            setVerificationId(event.verificationId);
-          }
-          listener.remove();
-        });
-
-        const errorListener = await FirebaseAuthentication.addListener('phoneVerificationFailed', (event: any) => {
-          console.error('Native phoneVerificationFailed event:', event);
-          let userMessage = 'فشل إرسال الكود: ' + (event.message || 'خطأ غير معروف.');
-          
-          if (event.message?.includes('39') || event.message?.includes('INTERNAL_ERROR')) {
-            userMessage = 'خطأ فني (-39): يجب تفعيل "Identity Platform" و "App Check" في Firebase.';
-          } else if (event.message?.includes('17028') || event.message?.includes('not authorized')) {
-            userMessage = 'خطأ في هوية التطبيق (17028): بصمة SHA-256 غير متطابقة أو Play Integrity API غير مفعّل في Google Cloud.';
-          }
-          
-          alert(userMessage);
-          errorListener.remove();
-        });
-
-        await FirebaseAuthentication.signInWithPhoneNumber({
-          phoneNumber,
-        });
-      } else {
-        if (!recaptchaContainerId) throw new Error('Recaptcha container ID is required for web');
-        
-        const container = document.getElementById(recaptchaContainerId);
-        if (!container) throw new Error(`Container with ID ${recaptchaContainerId} not found`);
-        
-        // Use a persistent widget ID to avoid re-creation issues
-        const widgetId = 'recaptcha-widget-main';
-        let widget = document.getElementById(widgetId);
-        if (!widget) {
-          widget = document.createElement('div');
-          widget.id = widgetId;
-          container.innerHTML = '';
-          container.appendChild(widget);
-        }
-
-        const verifier = new RecaptchaVerifier(auth, widgetId, {
-          size: 'invisible',
-          callback: () => {
-            console.log('reCAPTCHA solved');
-          },
-          'expired-callback': () => {
-            console.warn('reCAPTCHA expired');
-          }
-        });
-        
-        // Explicitly render to ensure verifier is initialized
-        await verifier.render();
-        
-        const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
-        setConfirmationResult(result);
-      }
+      await sendSmsOtp(phoneNumber);
     } catch (error: any) {
-      console.error('Detailed Phone Sign-In Error:', error);
-      const errorCode = error.code || '';
-      const errorMessage = error.message || String(error);
-      
-      if (errorMessage.includes('not authorized') || errorMessage.includes('17028')) {
-        throw new Error('هذا التطبيق غير مصرح له باستخدام Firebase. يرجى التأكد من إضافة بصمات SHA-1 و SHA-256 ومطابقة الـ Package Name في Firebase Console.');
-      } else if (errorMessage.includes('unauthorized-domain')) {
-        throw new Error('هذا النطاق غير مصرح به في Firebase Console.');
-      } else if (errorMessage.includes('invalid-phone-number')) {
-        throw new Error('رقم الهاتف المدخل غير صحيح.');
-      } else if (errorMessage.includes('-39') || errorCode.includes('internal-error')) {
-        throw new Error('خطأ في إعدادات نظام الحماية (Error -39). تأكد من: 1- تفعيل Identity Platform. 2- إضافة SHA-256. 3- إضافة الـ Debug Token الموضح في سجل Logcat إلى Firebase Console.');
-      }
-      
-      throw new Error(errorMessage);
+      console.error('Phone Sign-In Error:', error);
+      throw error;
     }
   };
 
   const verifyOtp = async (otp: string) => {
     try {
-      if (Capacitor.isNativePlatform()) {
-        if (!verificationId) throw new Error('لم يتم العثور على رمز التحقق الأصلي.');
-        
-        console.log('Verifying native OTP using hybrid approach:', otp);
-        
-        // Strategy: Use the Web SDK to verify the credential using the ID from the native layer.
-        // This ensures the JS auth state (onAuthStateChanged) is correctly updated.
-        const credential = PhoneAuthProvider.credential(verificationId, otp);
-        const userCredential = await signInWithCredential(auth, credential);
-        
-        console.log('Hybrid Verification Success. UID:', userCredential.user.uid);
+      // If pendingPhoneNumber is not set, we can't verify easily unless we pass it to OTP flow
+      // Local storage or state should hold it.
+      // But verifySmsOtp expects (phone, code).
+      // Let's ensure verifyOtp can work if we know the phone.
+      if (pendingPhoneNumber) {
+        await verifySmsOtp(pendingPhoneNumber, otp);
       } else {
-        if (!confirmationResult) throw new Error('Confirmation result not found');
-        await confirmationResult.confirm(otp);
+        throw new Error('رقم الهاتف غير متوفر للتحقق');
       }
     } catch (error: any) {
-      console.error('OTP Verification Error (Full):', error);
-      const errorMessage = error.message || '';
+      console.error('OTP Verification Error:', error);
+      throw error;
+    }
+  };
+
+  const sendSmsOtp = async (phoneNumber: string) => {
+    try {
+      setPendingPhoneNumber(phoneNumber);
+      const response = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber })
+      });
       
-      if (errorMessage.includes('invalid-verification-code')) {
-        throw new Error('كود التحقق غير صحيح.');
-      } else if (errorMessage.includes('session-expired')) {
-        throw new Error('انتهت صلاحية الجلسة، اطلب كوداً جديداً.');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'فشل إرسال كود التحقق عبر SMS');
+    } catch (error: any) {
+      console.error('SMS Send Error:', error);
+      throw error;
+    }
+  };
+
+  const verifySmsOtp = async (phoneNumber: string, code: string) => {
+    try {
+      const response = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber, code })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'فشل التحقق من الكود');
+      
+      if (data.token) {
+        await signInWithCustomToken(auth, data.token);
       }
-      
-      throw new Error('كود التحقق غير صحيح أو انتهت صلاحيته.');
+    } catch (error: any) {
+      console.error('SMS Verify Error:', error);
+      throw error;
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, loginWithEmail, registerWithEmail, resetPassword, signInWithPhone, verifyOtp, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      profile, 
+      loading, 
+      login, 
+      loginWithEmail, 
+      registerWithEmail, 
+      resetPassword, 
+      signInWithPhone, 
+      sendSmsOtp,
+      verifySmsOtp,
+      verifyOtp, 
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   );

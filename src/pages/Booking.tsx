@@ -243,7 +243,7 @@ export default function BookingPage() {
     setLoading(true);
     try {
       const phoneNumber = `${countryCode}${contactPhone.replace(/^0+/, '')}`;
-      await signInWithPhone(phoneNumber, 'recaptcha-container');
+      await signInWithPhone(phoneNumber);
       setOtpSent(true);
       alert('تم إرسال رمز التحقق إلى هاتفك');
     } catch (error: any) {
@@ -563,7 +563,7 @@ export default function BookingPage() {
                 </div>
               )}
 
-              <div id="recaptcha-container" className="flex justify-center my-2 min-h-[78px]"></div>
+              {/* No reCAPTCHA needed for custom OTP */}
             </div>
             <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100/50 space-y-2 text-sm">
               <div className="flex justify-between"><span>عدد المقاعد:</span><span className="font-bold">{selectedSeats.length}</span></div>

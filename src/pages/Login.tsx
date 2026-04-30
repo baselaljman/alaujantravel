@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 
 export default function Login() {
-  const { login, loginWithEmail, registerWithEmail, resetPassword, signInWithPhone, verifyOtp, user } = useAuth();
+  const { login, loginWithEmail, registerWithEmail, resetPassword, signInWithPhone, sendSmsOtp, verifySmsOtp, verifyOtp, user } = useAuth();
   const [authMode, setAuthMode] = useState<'email-login' | 'email-register' | 'phone'>('email-login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -77,35 +77,27 @@ export default function Login() {
     setMessage('');
     setLoading(true);
     try {
+      // Common phone processing
+      let cleanPhone = phone.trim();
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = cleanPhone.substring(1);
+      }
+      cleanPhone = cleanPhone.replace(/\D/g, '');
+      const formattedPhone = `${selectedCountry.code}${cleanPhone}`;
+
       if (!showOtpInput) {
-        // Handle leading zero and formatting
-        let cleanPhone = phone.trim();
-        if (cleanPhone.startsWith('0')) {
-          cleanPhone = cleanPhone.substring(1);
-        }
+        setMessage('جاري إرسال كود التحقق عبر SMS...');
+        await sendSmsOtp(formattedPhone);
         
-        // Remove any non-numeric characters for safety
-        cleanPhone = cleanPhone.replace(/\D/g, '');
-        
-        const formattedPhone = `${selectedCountry.code}${cleanPhone}`;
-        
-        setMessage('جاري التحقق من أمان الاتصال...');
-        await signInWithPhone(formattedPhone, 'recaptcha-container');
         setShowOtpInput(true);
-        setMessage('تم إرسال كود التحقق إلى هاتفك بنجاح ✅');
+        setMessage(`تم إرسال كود التحقق إلى رقم هاتفك بنجاح ✅`);
       } else {
-        await verifyOtp(otp);
+        await verifySmsOtp(formattedPhone, otp);
         navigate('/');
       }
     } catch (err: any) {
       console.error('Phone Auth Error:', err);
-      // Detailed error breakdown
-      const msg = err.message || '';
-      if (msg.includes('App Check') || msg.includes('-39')) {
-        setError('خطأ في أمان الاتصال: يرجى التأكد من تسجيل الرمز (Debug Token) في كونسول فايربيس كما هو موضح في الشرح.');
-      } else {
-        setError(msg || 'فشل التحقق من رقم الهاتف. تأكد من صحة الرقم.');
-      }
+      setError(err.message || 'فشل التحقق من رقم الهاتف. تأكد من صحة الرقم ومن وجود رصيد في UniMatrix.');
       setMessage('');
     } finally {
       setLoading(false);
@@ -157,9 +149,6 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Recaptcha Container for Web */}
-        <div id="recaptcha-container"></div>
-
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs text-center border border-red-100">
             {error}
@@ -175,10 +164,10 @@ export default function Login() {
         {isPhone ? (
           <form onSubmit={handlePhoneSubmit} className="space-y-4">
             {!showOtpInput ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Phone className="absolute left-3 top-3 text-stone-400" size={18} />
+                    <Phone className="absolute right-3 top-3 text-stone-400" size={18} />
                     <input
                       type="tel"
                       placeholder="05xxxxxxxx"
@@ -189,7 +178,7 @@ export default function Login() {
                       }}
                       required
                       dir="ltr"
-                      className="w-full bg-stone-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-left"
+                      className="w-full bg-stone-100 p-3 pr-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-left"
                     />
                   </div>
                   <div className="relative w-1/3">
@@ -216,7 +205,7 @@ export default function Login() {
               </div>
             ) : (
               <div className="relative">
-                <CheckCircle2 className="absolute left-3 top-3 text-stone-400" size={18} />
+                <CheckCircle2 className="absolute right-3 top-3 text-stone-400" size={18} />
                 <input
                   type="text"
                   placeholder="كود التحقق (6 أرقام)"
@@ -224,7 +213,7 @@ export default function Login() {
                   onChange={(e) => setOtp(e.target.value)}
                   required
                   maxLength={6}
-                  className="w-full bg-stone-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-center tracking-widest font-bold"
+                  className="w-full bg-stone-100 p-3 pr-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-center tracking-widest font-bold"
                 />
               </div>
             )}
@@ -258,39 +247,39 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
           {isRegister && (
             <div className="relative">
-              <User className="absolute left-3 top-3 text-stone-400" size={18} />
+              <User className="absolute right-3 top-3 text-stone-400" size={18} />
               <input
                 type="text"
                 placeholder="الاسم الكامل"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full bg-stone-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-stone-100 p-3 pr-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
           )}
 
           <div className="relative">
-            <Mail className="absolute left-3 top-3 text-stone-400" size={18} />
+            <Mail className="absolute right-3 top-3 text-stone-400" size={18} />
             <input
               type="email"
               placeholder="البريد الإلكتروني"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-stone-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full bg-stone-100 p-3 pr-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
 
           <div className="relative">
-            <Lock className="absolute left-3 top-3 text-stone-400" size={18} />
+            <Lock className="absolute right-3 top-3 text-stone-400" size={18} />
             <input
               type="password"
               placeholder="كلمة المرور"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required={!loading}
-              className="w-full bg-stone-100 p-3 pl-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full bg-stone-100 p-3 pr-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
 

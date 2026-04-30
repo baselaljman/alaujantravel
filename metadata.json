@@ -1,5 +1,5 @@
 {
-  "name": "Al-Awajan Travel",
+  "name": "العوجان للسياحة",
   "description": "تطبيق العوجان للسياحة والسفر لحجز الرحلات الدولية وتتبع الطرود",
   "requestFramePermissions": ["geolocation"]
 }
