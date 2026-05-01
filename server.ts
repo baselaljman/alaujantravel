@@ -19,96 +19,103 @@ const __dirname = path.dirname(__filename);
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
-// Initialize Firebase Admin
-if (admin.apps.length === 0) {
-  console.log("Firebase Admin: Attempting initialization...");
-  const serviceAccountPath = path.join(process.cwd(), "service-account.json");
-  
-  if (fs.existsSync(serviceAccountPath)) {
-    try {
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf-8"));
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`
-      });
-      console.log("Firebase Admin: Initialized using service-account.json file.");
-    } catch (err) {
-      console.error("Firebase Admin: Error reading service-account.json:", err);
-    }
-  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    try {
-      let saRaw = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
-      console.log("Firebase Admin: FIREBASE_SERVICE_ACCOUNT found. Length:", saRaw.length);
-      
-      // Handle surrounding quotes
-      if (saRaw.startsWith("'") && saRaw.endsWith("'")) saRaw = saRaw.slice(1, -1);
-      if (saRaw.startsWith('"') && saRaw.endsWith('"')) saRaw = saRaw.slice(1, -1);
-      
-      let serviceAccount;
-      try {
-        serviceAccount = JSON.parse(saRaw);
-      } catch (parseError: any) {
-        console.error("Firebase Admin: Initial JSON parse failed. Attempting cleanup...");
-        const cleanerRaw = saRaw.replace(/\\"/g, '"').replace(/\\n/g, '\n');
-        try {
-          serviceAccount = JSON.parse(cleanerRaw);
-        } catch (e2: any) {
-          console.error("Firebase Admin: RE-PARSE FAILED:", e2.message);
-          throw e2;
-        }
-      }
-      
-      console.log(`Firebase Admin: Parsed JSON for project: ${serviceAccount.project_id}`);
-      
-      // DEEP CLEAN PRIVATE KEY
-      if (serviceAccount.private_key && typeof serviceAccount.private_key === 'string') {
-        let pKey = serviceAccount.private_key.trim();
-        
-        // Remove surrounding quotes if any
-        if (pKey.startsWith('"') && pKey.endsWith('"')) pKey = pKey.slice(1, -1);
-        if (pKey.startsWith("'") && pKey.endsWith("'")) pKey = pKey.slice(1, -1);
-        
-        // Fix double escaping of newlines
-        pKey = pKey.replace(/\\n/g, '\n');
-        
-        // Ensure it uses unix newlines solely
-        pKey = pKey.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        
-        // Ensure it has the correct headers
-        if (!pKey.includes("-----BEGIN PRIVATE KEY-----")) {
-          console.error("Firebase Admin: Private key is missing BEGIN header!");
-        }
-        
-        serviceAccount.private_key = pKey;
-        console.log(`Firebase Admin: Private key cleaned (length: ${pKey.length}). Lines: ${pKey.split('\n').length}`);
-      } else {
-        console.error("Firebase Admin: NO PRIVATE KEY FOUND IN JSON!");
-      }
+// Messaggio Configuration
+const MESSAGGIO_SECRET_KEY = process.env.MESSAGGIO_SECRET_KEY || "";
+const MESSAGGIO_SENDER_CODE = process.env.MESSAGGIO_SENDER_CODE || "";
+const MESSAGGIO_PROJECT_LOGIN = process.env.MESSAGGIO_PROJECT_LOGIN || "";
 
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
-      });
-      console.log("Firebase Admin: app.initializeApp called successfully.");
-    } catch (e: any) {
-      console.error("Firebase Admin: FATAL INITIALIZATION ERROR:", e.message);
-      if (e.message.includes("Unexpected token")) {
-        console.error("Diagnostic: The JSON is likely corrupted or has invisible characters.");
+// Robust Firebase Admin Initialization logic
+const initializeFirebaseAdmin = () => {
+  if (admin.apps.length > 0) return;
+
+  console.log("Firebase Admin: Initializing...");
+  
+  const saEnv = process.env.FIREBASE_SERVICE_ACCOUNT || "";
+  
+  if (!saEnv) {
+    console.warn("Firebase Admin: FIREBASE_SERVICE_ACCOUNT env var is missing. Please add it to Secrets.");
+    admin.initializeApp({ projectId: firebaseConfig.projectId });
+    return;
+  }
+
+  try {
+    let cleanSa = saEnv.trim();
+    
+    // Strip surrounding single/double quotes if added by the environment/shell
+    if ((cleanSa.startsWith("'") && cleanSa.endsWith("'")) || (cleanSa.startsWith("\"") && cleanSa.endsWith("\""))) {
+      cleanSa = cleanSa.slice(1, -1);
+    }
+
+    let saJson;
+    try {
+      saJson = JSON.parse(cleanSa);
+    } catch (e) {
+      // Emergency cleanup for common copy-paste escaping issues
+      const fixedSa = cleanSa.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      saJson = JSON.parse(fixedSa);
+    }
+
+    // Standardize the private key line breaks
+    if (saJson.private_key) {
+      // If the string contains literal \n characters (common in env vars or manual copy), replace them
+      // If it already has real newlines, this won't hurt
+      saJson.private_key = saJson.private_key.replace(/\\n/g, '\n');
+    }
+
+    admin.initializeApp({
+      credential: admin.credential.cert(saJson)
+    });
+    console.log(`Firebase Admin: Success! Initialized for project: ${saJson.project_id}`);
+    
+    // Global connectivity status
+    const testDbAccess = async () => {
+      const dbId = firebaseConfig.firestoreDatabaseId;
+      console.log(`Firebase Admin: Testing Firestore connection (Project: ${saJson.project_id}, DB: ${dbId || '(default)'})`);
+      
+      try {
+        // Try the configured database first
+        dbInstance = getFirestore(admin.apps[0], dbId);
+        await dbInstance.collection('_health_check').doc('ping').get();
+        firebaseStatus = { connected: true, error: null, lastChecked: new Date() };
+        console.log("Firebase Admin: Firestore connectivity test SUCCESSFUL.");
+      } catch (err: any) {
+        console.error(`Firebase Admin: Initial attempt failed. Code: ${err.code}, Message: ${err.message}`);
+        
+        // If it's a NOT_FOUND error (5), try falling back to (default)
+        if (err.message.includes("5 NOT_FOUND") || err.code === 5) {
+          console.log("Firebase Admin: Named database not found. Falling back to (default) database...");
+          try {
+            dbInstance = getFirestore(admin.apps[0]);
+            await dbInstance.collection('_health_check').doc('ping').get();
+            firebaseStatus = { connected: true, error: null, lastChecked: new Date() };
+            console.log("Firebase Admin: FALLBACK to (default) database SUCCESSFUL.");
+          } catch (fallbackErr: any) {
+             firebaseStatus = { connected: false, error: fallbackErr.message, lastChecked: new Date() };
+             console.error("Firebase Admin: FALLBACK also failed:", fallbackErr.message);
+          }
+        } else {
+          firebaseStatus = { connected: false, error: err.message, lastChecked: new Date() };
+        }
       }
+    };
+    testDbAccess();
+
+  } catch (err: any) {
+    console.error("Firebase Admin: Initialization failed:", err.message);
+    // Emergency Fallback
+    if (!admin.apps.length) {
       admin.initializeApp({ projectId: firebaseConfig.projectId });
     }
-  } else {
-    console.warn("Firebase Admin: No service account found. Falling back to default credentials (may fail).");
-    admin.initializeApp({
-      projectId: firebaseConfig.projectId
-    });
   }
-}
+};
+
+initializeFirebaseAdmin();
 
 let dbInstance: admin.firestore.Firestore | null = null;
 const getDb = () => {
   if (!dbInstance) {
     if (!admin.apps.length) throw new Error("Firebase Admin not initialized");
+    // If not set by initializeFirebaseAdmin's test, try config
     dbInstance = getFirestore(admin.apps[0], firebaseConfig.firestoreDatabaseId);
   }
   return dbInstance;
@@ -120,27 +127,6 @@ let firebaseStatus = {
   error: null as string | null,
   lastChecked: null as Date | null
 };
-
-// Test connectivity immediately and periodically
-const testDbAccess = async () => {
-  try {
-    const db = getDb();
-    await db.collection('_health_check').doc('ping').set({ 
-      time: new Date(),
-      note: "Server startup check" 
-    });
-    firebaseStatus = { connected: true, error: null, lastChecked: new Date() };
-    console.log("Firebase Admin: Firestore connectivity test SUCCESSFUL.");
-  } catch (err: any) {
-    firebaseStatus = { connected: false, error: err.message, lastChecked: new Date() };
-    console.error("Firebase Admin: Firestore connectivity test FAILED!");
-    console.error(`Error Code: ${err.code}, Message: ${err.message}`);
-  }
-};
-testDbAccess();
-
-// UniMatrix Configuration
-const UNIMATRIX_ACCESS_KEY = process.env.UNIMATRIX_ACCESS_KEY || "";
 
 async function startServer() {
   const app = express();
@@ -245,7 +231,7 @@ async function startServer() {
     }
   });
 
-  // OTP Routes (SMS via UniMatrix)
+  // OTP Routes (SMS via Messaggio)
   app.post("/api/auth/otp/send", async (req, res) => {
     const { phoneNumber } = req.body;
     
@@ -253,8 +239,8 @@ async function startServer() {
       return res.status(400).json({ error: "رقم الهاتف مطلوب" });
     }
 
-    if (!UNIMATRIX_ACCESS_KEY) {
-      return res.status(500).json({ error: "إعدادات UniMatrix غير مكتملة (نقص مفتاح الوصول)" });
+    if (!MESSAGGIO_SECRET_KEY) {
+      return res.status(500).json({ error: "إعدادات Messaggio غير مكتملة (نقص المفتاح السري Secret Key)" });
     }
 
     try {
@@ -274,28 +260,65 @@ async function startServer() {
         if (firestoreError.message?.includes('16') || firestoreError.message?.includes('UNAUTHENTICATED')) {
           return res.status(500).json({ 
             error: "فشل المصادقة مع Firebase (خطأ 16).",
-            details: "يحدث هذا عادةً لأن ملف مفتاح الخدمة (Service Account) غير صحيح، أو أنه يخص مشروعاً آخر، أو أنه تم نسخه بشكل خاطئ. يرجى التأكد من الحصول على المفتاح من: Firebase Console > Project Settings > Service Accounts > Generate New Private Key."
+            details: "يحدث هذا عادةً لأن ملف مفتاح الخدمة (Service Account) غير صحيح."
           });
         }
         throw firestoreError;
       }
 
-      // Send via UniMatrix API
-      // Documented at https://www.unimtx.com/docs/api/messaging/send-sms
-      const response = await axios.post(`https://api.unimtx.com/?action=send&accessKey=${UNIMATRIX_ACCESS_KEY}`, {
-        to: phoneNumber,
-        text: `كود التحقق الخاص بك هو: ${otpCode}. صالح لمدة 5 دقائق.`
+      // Send via Messaggio API
+      // Detailed logging for debugging "failed to extract permissions"
+      console.log(`Messaggio: Sending request to project ${MESSAGGIO_PROJECT_LOGIN}`);
+      console.log(`Messaggio: Auth token length: ${MESSAGGIO_SECRET_KEY.length}`);
+      
+      const response = await axios.post(`https://api.messaggio.com/api/v1/projects/${MESSAGGIO_PROJECT_LOGIN}/messages`, {
+        messages: [
+          {
+            to: phoneNumber,
+            from: MESSAGGIO_SENDER_CODE,
+            channel: "sms",
+            content: {
+              text: `كود التحقق الخاص بك هو: ${otpCode}. صالح لمدة 5 دقائق.`
+            }
+          }
+        ]
+      }, {
+        headers: {
+          // Some Messaggio documentations mention Bearer, others mention it as a plain header.
+          // If Bearer fails with 'failed to extract permissions', might need to try just the key.
+          'Authorization': MESSAGGIO_SECRET_KEY.startsWith('Bearer ') ? MESSAGGIO_SECRET_KEY : `Bearer ${MESSAGGIO_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        // Capture raw response for better error tracing
+        validateStatus: () => true 
       });
 
-      if (response.data.code === '0' || response.data.status === 'success') {
-        res.json({ success: true, messageId: response.data.data?.messageId });
+      console.log("Messaggio API Raw Status:", response.status);
+      console.log("Messaggio API Response Data:", JSON.stringify(response.data));
+
+      if (response.status === 200 || response.status === 201) {
+        res.json({ success: true, messageId: response.data.messages?.[0]?.id });
       } else {
-        console.error("UniMatrix Error Response:", response.data);
-        res.status(500).json({ error: `فشل إرسال الرسالة: ${response.data.message || 'خطأ غير معروف'}` });
+        const errorData = response.data;
+        const errorMessage = errorData?.error || errorData?.message || "Unknown error";
+        res.status(response.status).json({ 
+          error: `فشل إرسال الرسالة عبر Messaggio: ${errorMessage}`,
+          details: errorData
+        });
       }
     } catch (error: any) {
-      console.error("UniMatrix SMS Send Error:", error);
-      res.status(500).json({ error: error.message || "حدث خطأ أثناء إرسال الرسالة القصيرة" });
+      console.error("Messaggio SMS Send Error:", error.response?.data || error.message);
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.error || errorData?.message || error.message;
+      const errorStatus = errorData?.status || "Error";
+      
+      res.status(500).json({ 
+        error: `فشل إرسال الرسالة: ${errorMessage}`,
+        details: {
+          status: errorStatus,
+          raw: errorData
+        }
+      });
     }
   });
 
