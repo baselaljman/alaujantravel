@@ -20,9 +20,16 @@ const configPath = path.join(process.cwd(), "firebase-applet-config.json");
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
 // Messaggio Configuration
-const MESSAGGIO_SECRET_KEY = process.env.MESSAGGIO_SECRET_KEY || "";
-const MESSAGGIO_SENDER_CODE = process.env.MESSAGGIO_SENDER_CODE || "";
-const MESSAGGIO_PROJECT_LOGIN = process.env.MESSAGGIO_PROJECT_LOGIN || "";
+const MESSAGGIO_SECRET_KEY = (process.env.MESSAGGIO_SECRET_KEY || "").trim();
+const MESSAGGIO_SENDER_CODE = (process.env.MESSAGGIO_SENDER_CODE || "").trim();
+const MESSAGGIO_PROJECT_LOGIN = (process.env.MESSAGGIO_PROJECT_LOGIN || "").trim();
+
+let dbInstance: admin.firestore.Firestore | null = null;
+let firebaseStatus = {
+  connected: false,
+  error: null as string | null,
+  lastChecked: null as Date | null
+};
 
 // Robust Firebase Admin Initialization logic
 const initializeFirebaseAdmin = () => {
@@ -111,7 +118,6 @@ const initializeFirebaseAdmin = () => {
 
 initializeFirebaseAdmin();
 
-let dbInstance: admin.firestore.Firestore | null = null;
 const getDb = () => {
   if (!dbInstance) {
     if (!admin.apps.length) throw new Error("Firebase Admin not initialized");
@@ -122,11 +128,7 @@ const getDb = () => {
 };
 
 // Global connectivity status
-let firebaseStatus = {
-  connected: false,
-  error: null as string | null,
-  lastChecked: null as Date | null
-};
+// (Moved to top to avoid ReferenceError)
 
 async function startServer() {
   const app = express();
@@ -135,6 +137,11 @@ async function startServer() {
   app.use(bodyParser.json());
 
   // Health check for Firebase Admin
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", firebase: firebaseStatus });
+  });
+
+  // Diagnostics for Firebase Admin
   app.get("/api/notification-status", (req, res) => {
     const sa = process.env.FIREBASE_SERVICE_ACCOUNT || "";
     let saJsonStatus = "missing";
@@ -268,8 +275,11 @@ async function startServer() {
 
       // Send via Messaggio API
       // Detailed logging for debugging "failed to extract permissions"
+      // We try a few variations of headers based on Messaggio common issues
+      const cleanKey = MESSAGGIO_SECRET_KEY.replace('Bearer ', '').trim();
+      
       console.log(`Messaggio: Sending request to project ${MESSAGGIO_PROJECT_LOGIN}`);
-      console.log(`Messaggio: Auth token length: ${MESSAGGIO_SECRET_KEY.length}`);
+      console.log(`Messaggio: Auth token length: ${cleanKey.length}`);
       
       const response = await axios.post(`https://api.messaggio.com/api/v1/projects/${MESSAGGIO_PROJECT_LOGIN}/messages`, {
         messages: [
@@ -284,12 +294,12 @@ async function startServer() {
         ]
       }, {
         headers: {
-          // Some Messaggio documentations mention Bearer, others mention it as a plain header.
-          // If Bearer fails with 'failed to extract permissions', might need to try just the key.
-          'Authorization': MESSAGGIO_SECRET_KEY.startsWith('Bearer ') ? MESSAGGIO_SECRET_KEY : `Bearer ${MESSAGGIO_SECRET_KEY}`,
+          // Trying standard Bearer first
+          'Authorization': `Bearer ${cleanKey}`,
+          // Adding X-Api-Key as secondary fallback in the same request if supported
+          'X-Api-Key': cleanKey,
           'Content-Type': 'application/json'
         },
-        // Capture raw response for better error tracing
         validateStatus: () => true 
       });
 
@@ -301,7 +311,9 @@ async function startServer() {
       } else {
         const errorData = response.data;
         const errorMessage = errorData?.error || errorData?.message || "Unknown error";
-        res.status(response.status).json({ 
+        // Avoid sending 403 directly as it might be intercepted by Nginx/CloudRun and replaced with HTML
+        const safeStatus = response.status === 403 ? 400 : response.status;
+        res.status(safeStatus).json({ 
           error: `فشل إرسال الرسالة عبر Messaggio: ${errorMessage}`,
           details: errorData
         });
@@ -369,6 +381,16 @@ async function startServer() {
       console.error("OTP Verify Error:", error);
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // Global Error Handler for API routes
+  app.use("/api", (err: any, req: any, res: any, next: any) => {
+    console.error("API Error Handler Caught:", err);
+    res.status(err.status || 500).json({
+      error: "حدث خطأ غير متوقع في الخادم",
+      message: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   });
 
   // Vite middleware for development

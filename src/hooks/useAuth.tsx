@@ -200,8 +200,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ phoneNumber })
       });
       
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'فشل إرسال كود التحقق عبر SMS');
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'فشل إرسال كود التحقق عبر SMS');
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response from /api/auth/otp/send:', text);
+        throw new Error(`خطأ في الخادم (HTML): ${response.status} ${response.statusText}`);
+      }
     } catch (error: any) {
       console.error('SMS Send Error:', error);
       throw error;
@@ -216,11 +223,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ phoneNumber, code })
       });
       
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'فشل التحقق من الكود');
-      
-      if (data.token) {
-        await signInWithCustomToken(auth, data.token);
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'فشل التحقق من الكود');
+        
+        if (data.token) {
+          await signInWithCustomToken(auth, data.token);
+        }
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response from /api/auth/otp/verify:', text);
+        throw new Error(`خطأ في الخادم (HTML): ${response.status} ${response.statusText}`);
       }
     } catch (error: any) {
       console.error('SMS Verify Error:', error);
