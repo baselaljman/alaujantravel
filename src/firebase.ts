@@ -16,14 +16,18 @@ if (typeof window !== 'undefined') {
 
 // Initialize App Check with reCAPTCHA Enterprise
 if (typeof window !== 'undefined') {
-  // Use the verified Android key from your console
-  const RECAPTCHA_SITE_KEY = '6LdXHsAsAAAAANXn2_p2Qi5BCuwgJEcpsFC_z6tX';
+  // Use the key provided by the user
+  const RECAPTCHA_SITE_KEY = '6LdWhOAsAAAAAEdw1327XQy2BtKF4OWOoyYXaBwe';
   
-  initializeAppCheck(app, {
-    provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),
-    isTokenAutoRefreshEnabled: true
-  });
-  console.log('App Check initialized with reCAPTCHA Enterprise (Debug Token Active)');
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true
+    });
+    console.log('App Check initialized with reCAPTCHA Enterprise');
+  } catch (err) {
+    console.error('App Check initialization failed:', err);
+  }
 }
 
 // Use initializeFirestore with experimentalForceLongPolling to fix connection issues in some environments

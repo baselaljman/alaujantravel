@@ -1,6 +1,26 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, signInWithCustomToken } from '../firebase';
-import { onAuthStateChanged, signInWithPopup, signOut, User, ConfirmationResult } from 'firebase/auth';
+import { db, googleProvider } from '../firebase';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signOut, 
+  User, 
+  ConfirmationResult, 
+  RecaptchaVerifier,
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signInWithCredential,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
+  signInWithPhoneNumber,
+  PhoneAuthProvider,
+  signInWithCustomToken
+} from 'firebase/auth';
+
+// Use the singleton auth from our firebase config
+import { auth } from '../firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -28,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [verificationId, setVerificationId] = useState<string | null>(null);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState<any>(null);
   const [pendingPhoneNumber, setPendingPhoneNumber] = useState<string | null>(null);
 
   useEffect(() => {
@@ -165,9 +185,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
-  const signInWithPhone = async (phoneNumber: string) => {
+  const setupRecaptcha = (containerId: string = 'recaptcha-container') => {
     try {
-      await sendSmsOtp(phoneNumber);
+      console.log('Setting up Recaptcha for container:', containerId);
+      
+      // Ensure auth is defined
+      if (!auth) {
+        console.error('Auth instance is null or undefined in useAuth');
+        throw new Error('مشكلة في تهيئة Firebase Auth');
+      }
+
+      // Check if container exists
+      const element = document.getElementById(containerId);
+      if (!element) {
+        console.error(`Recaptcha container element not found: ${containerId}`);
+        throw new Error('لم يتم العثور على عنصر التحقق (reCAPTCHA). يرجى التأكد من ظهور الحقل المخصص للتحقق.');
+      }
+
+      // Reset any existing verifier if possible
+      if (recaptchaVerifier) {
+        console.log('Clearing existing recaptcha verifier');
+        try {
+          recaptchaVerifier.clear();
+        } catch (e) {
+          console.warn('Error clearing old recaptcha verifier:', e);
+        }
+      }
+
+      console.log('Creating new RecaptchaVerifier instance');
+      const verifier = new RecaptchaVerifier(auth, element, {
+        size: 'invisible',
+        callback: (response: any) => {
+          console.log('Recaptcha resolved successfully:', !!response);
+        },
+        'expired-callback': () => {
+          console.log('Recaptcha expired');
+          setRecaptchaVerifier(null);
+        }
+      });
+      
+      setRecaptchaVerifier(verifier);
+      return verifier;
+    } catch (error) {
+      console.error('Error in setupRecaptcha:', error);
+      throw error;
+    }
+  };
+
+  const signInWithPhone = async (phoneNumber: string, recaptchaContainerId: string = 'recaptcha-container') => {
+    try {
+      const verifier = setupRecaptcha(recaptchaContainerId);
+      const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+      setConfirmationResult(result);
+      setPendingPhoneNumber(phoneNumber);
     } catch (error: any) {
       console.error('Phone Sign-In Error:', error);
       throw error;
@@ -176,70 +246,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const verifyOtp = async (otp: string) => {
     try {
-      // If pendingPhoneNumber is not set, we can't verify easily unless we pass it to OTP flow
-      // Local storage or state should hold it.
-      // But verifySmsOtp expects (phone, code).
-      // Let's ensure verifyOtp can work if we know the phone.
-      if (pendingPhoneNumber) {
-        await verifySmsOtp(pendingPhoneNumber, otp);
-      } else {
-        throw new Error('رقم الهاتف غير متوفر للتحقق');
+      if (!confirmationResult) {
+        throw new Error('لم يتم إرسال كود التحقق بعد');
       }
+      await confirmationResult.confirm(otp);
+      setConfirmationResult(null);
     } catch (error: any) {
       console.error('OTP Verification Error:', error);
-      throw error;
+      throw new Error('كود التحقق غير صحيح أو انتهت صلاحيته');
     }
   };
 
   const sendSmsOtp = async (phoneNumber: string) => {
-    try {
-      setPendingPhoneNumber(phoneNumber);
-      const response = await fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber })
-      });
-      
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'فشل إرسال كود التحقق عبر SMS');
-      } else {
-        const text = await response.text();
-        console.error('Non-JSON response from /api/auth/otp/send:', text);
-        throw new Error(`خطأ في الخادم (HTML): ${response.status} ${response.statusText}`);
-      }
-    } catch (error: any) {
-      console.error('SMS Send Error:', error);
-      throw error;
-    }
+    await signInWithPhone(phoneNumber);
   };
 
   const verifySmsOtp = async (phoneNumber: string, code: string) => {
-    try {
-      const response = await fetch('/api/auth/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber, code })
-      });
-      
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'فشل التحقق من الكود');
-        
-        if (data.token) {
-          await signInWithCustomToken(auth, data.token);
-        }
-      } else {
-        const text = await response.text();
-        console.error('Non-JSON response from /api/auth/otp/verify:', text);
-        throw new Error(`خطأ في الخادم (HTML): ${response.status} ${response.statusText}`);
-      }
-    } catch (error: any) {
-      console.error('SMS Verify Error:', error);
-      throw error;
-    }
+    await verifyOtp(code);
   };
 
   return (

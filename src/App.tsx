@@ -25,6 +25,8 @@ export default function App() {
             <Route path="/admin" element={<AdminDashboard />} />
           </Routes>
         </Layout>
+        {/* Firebase Phone Auth reCAPTCHA container */}
+        <div id="recaptcha-container"></div>
       </Router>
     </AuthProvider>
   );
