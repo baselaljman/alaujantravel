@@ -1,13 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { db, googleProvider } from '../firebase';
 import { 
+  auth, 
+  db, 
+  googleProvider,
   onAuthStateChanged, 
   signInWithPopup, 
-  signOut, 
-  User, 
-  ConfirmationResult, 
-  RecaptchaVerifier,
-  getAuth,
+  signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
@@ -16,12 +14,21 @@ import {
   sendPasswordResetEmail,
   signInWithPhoneNumber,
   PhoneAuthProvider,
-  signInWithCustomToken
-} from 'firebase/auth';
-
-// Use the singleton auth from our firebase config
-import { auth } from '../firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+  signInWithCustomToken,
+  RecaptchaVerifier,
+  // Firestore
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  deleteDoc, 
+  updateDoc, 
+  onSnapshot
+} from '../firebase';
+import { User, ConfirmationResult } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { UserProfile } from '../types';
@@ -215,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Creating new RecaptchaVerifier instance');
       const verifier = new RecaptchaVerifier(auth, element, {
         size: 'invisible',
+        sitekey: '6LeGnuAsAAAAAFmuuiTMd86YJbCP_gsXcNiiiO8s',
         callback: (response: any) => {
           console.log('Recaptcha resolved successfully:', !!response);
         },

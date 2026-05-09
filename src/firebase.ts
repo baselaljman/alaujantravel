@@ -16,8 +16,8 @@ if (typeof window !== 'undefined') {
 
 // Initialize App Check with reCAPTCHA Enterprise
 if (typeof window !== 'undefined') {
-  // Use the key provided by the user
-  const RECAPTCHA_SITE_KEY = '6LdWhOAsAAAAAEdw1327XQy2BtKF4OWOoyYXaBwe';
+  // Use the new key provided by the user in the screenshot
+  const RECAPTCHA_SITE_KEY = '6LeGnuAsAAAAAFmuuiTMd86YJbCP_gsXcNiiiO8s';
   
   try {
     initializeAppCheck(app, {
