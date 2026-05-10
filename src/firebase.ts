@@ -11,14 +11,16 @@ const app = initializeApp(firebaseConfig);
 // App Check Debug Token - MUST be set BEFORE initializeAppCheck
 if (typeof window !== 'undefined') {
   // @ts-ignore
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = 'a10107b9-7971-4769-a443-6ef597d6d64c';
+  window.FIREBASE_APPCHECK_DEBUG_TOKEN = 'a10107b9-7971-4769-a443-6ef597d6d64c';
+  console.log('App Check Debug Token has been set');
 }
 
 // Initialize App Check with reCAPTCHA Enterprise
 if (typeof window !== 'undefined') {
-  // Use the new key provided by the user in the screenshot
-  const RECAPTCHA_SITE_KEY = '6LeGnuAsAAAAAFmuuiTMd86YJbCP_gsXcNiiiO8s';
+  // Use the reCAPTCHA Enterprise site key
+  const RECAPTCHA_SITE_KEY = '6LeOkeMsAAAAAOpLfkmNXJzVX1adZCTPOBGt20Xk';
   
+  /*
   try {
     initializeAppCheck(app, {
       provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),
@@ -28,11 +30,13 @@ if (typeof window !== 'undefined') {
   } catch (err) {
     console.error('App Check initialization failed:', err);
   }
+  */
 }
 
-// Use initializeFirestore with experimentalForceLongPolling to fix connection issues in some environments
+// Use initializeFirestore with optimized settings for connectivity
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
+  ignoreUndefinedProperties: true,
 }, firebaseConfig.firestoreDatabaseId);
 
 // Offline Persistence disabled as per user request

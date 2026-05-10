@@ -1,8 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
-  auth, 
-  db, 
-  googleProvider,
   onAuthStateChanged, 
   signInWithPopup, 
   signOut,
@@ -16,7 +13,15 @@ import {
   PhoneAuthProvider,
   signInWithCustomToken,
   RecaptchaVerifier,
-  // Firestore
+  User as User,
+  ConfirmationResult
+} from 'firebase/auth';
+import { 
+  auth, 
+  db, 
+  googleProvider,
+} from '../firebase';
+import { 
   doc, 
   getDoc, 
   setDoc, 
@@ -26,9 +31,9 @@ import {
   getDocs, 
   deleteDoc, 
   updateDoc, 
-  onSnapshot
-} from '../firebase';
-import { User, ConfirmationResult } from 'firebase/auth';
+  onSnapshot,
+  Timestamp
+} from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { UserProfile } from '../types';
@@ -55,11 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [recaptchaVerifier, setRecaptchaVerifier] = useState<any>(null);
-  const [pendingPhoneNumber, setPendingPhoneNumber] = useState<string | null>(null);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
+
+    // Set persistence language to Arabic for SMS and reCAPTCHA
+    auth.languageCode = 'ar';
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUser(user);
@@ -192,76 +199,150 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
-  const setupRecaptcha = (containerId: string = 'recaptcha-container') => {
+  const setupRecaptcha = async (containerId: string = 'recaptcha-container') => {
     try {
-      console.log('Setting up Recaptcha for container:', containerId);
+      console.log('--- Setup Recaptcha Debug ---');
       
-      // Ensure auth is defined
-      if (!auth) {
-        console.error('Auth instance is null or undefined in useAuth');
+      if (typeof window === 'undefined') return null;
+      
+      if (!auth || typeof auth.onAuthStateChanged !== 'function') {
+        console.error('Auth instance is invalid!', auth);
         throw new Error('مشكلة في تهيئة Firebase Auth');
       }
 
-      // Check if container exists
+      // Ensure the container exists
       const element = document.getElementById(containerId);
       if (!element) {
         console.error(`Recaptcha container element not found: ${containerId}`);
-        throw new Error('لم يتم العثور على عنصر التحقق (reCAPTCHA). يرجى التأكد من ظهور الحقل المخصص للتحقق.');
+        throw new Error(`لم يتم العثور على عنصر التحقق (reCAPTCHA) بالمعرف: ${containerId}`);
       }
 
-      // Reset any existing verifier if possible
+      // If we already have a verifier, try to reuse it
       if (recaptchaVerifier) {
-        console.log('Clearing existing recaptcha verifier');
-        try {
-          recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing old recaptcha verifier:', e);
-        }
+        console.log('Reusing existing RecaptchaVerifier');
+        // Check if the verifier's element is still in the DOM
+        return recaptchaVerifier;
       }
 
-      console.log('Creating new RecaptchaVerifier instance');
+      // Clear the container content to avoid "container is not empty" errors
+      element.innerHTML = '';
+
+      console.log('Instantiating new RecaptchaVerifier with element...');
+      // By passing the element directly, we avoid some potential string ID lookup issues.
+      // We are removing the explicit sitekey because it's causing "Invalid site key" errors on this domain.
+      // Firebase will use the default sitekey associated with your project.
       const verifier = new RecaptchaVerifier(auth, element, {
         size: 'invisible',
-        sitekey: '6LeGnuAsAAAAAFmuuiTMd86YJbCP_gsXcNiiiO8s',
-        callback: (response: any) => {
-          console.log('Recaptcha resolved successfully:', !!response);
+        callback: () => {
+          console.log('reCAPTCHA solved successfully');
         },
         'expired-callback': () => {
-          console.log('Recaptcha expired');
+          console.log('reCAPTCHA expired');
           setRecaptchaVerifier(null);
         }
       });
       
+      console.log('RecaptchaVerifier instantiated, rendering...');
+      await verifier.render();
+      console.log('RecaptchaVerifier rendered successfully');
+      
       setRecaptchaVerifier(verifier);
       return verifier;
-    } catch (error) {
-      console.error('Error in setupRecaptcha:', error);
+    } catch (error: any) {
+      console.error('setupRecaptcha Critical Failure:', error);
       throw error;
     }
   };
 
   const signInWithPhone = async (phoneNumber: string, recaptchaContainerId: string = 'recaptcha-container') => {
     try {
-      const verifier = setupRecaptcha(recaptchaContainerId);
-      const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+      console.log('--- SignInWithPhone Start ---');
+      
+      // Clear any previous confirmation result to avoid stale state
+      setConfirmationResult(null);
+      
+      let finalPhone = phoneNumber.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
+      if (!finalPhone.startsWith('+')) {
+        finalPhone = `+${finalPhone}`;
+      }
+      
+      if (finalPhone.length < 8) {
+        throw new Error('رقم الهاتف غير صالح، يجب أن يبدأ بـ + ويتضمن مفتاح الدولة');
+      }
+
+      // Ensure we have a fresh verifier
+      const verifier = await setupRecaptcha(recaptchaContainerId);
+      if (!verifier) throw new Error('فشل تهيئة مدقق التحقق');
+      
+      console.log('Calling signInWithPhoneNumber with phone:', finalPhone);
+      const result = await signInWithPhoneNumber(auth, finalPhone, verifier);
+      console.log('signInWithPhoneNumber Success');
       setConfirmationResult(result);
-      setPendingPhoneNumber(phoneNumber);
     } catch (error: any) {
       console.error('Phone Sign-In Error:', error);
+      
+      // Specialized cleanup for recaptcha errors
+      if (error.code === 'auth/argument-error' || error.code === 'auth/invalid-app-credential') {
+        console.log('Cleaning up verifier after specific error');
+        if (recaptchaVerifier) {
+          try { recaptchaVerifier.clear(); } catch(e) {}
+        }
+        setRecaptchaVerifier(null);
+      }
       throw error;
     }
   };
 
   const verifyOtp = async (otp: string) => {
     try {
-      if (!confirmationResult) {
-        throw new Error('لم يتم إرسال كود التحقق بعد');
+      console.log('--- VerifyOtp Start ---');
+      console.log('OTP being verified:', otp);
+      
+      if (!otp || typeof otp !== 'string' || otp.trim().length === 0) {
+        throw new Error('يرجى إدخال رمز التحقق');
       }
-      await confirmationResult.confirm(otp);
+      
+      if (!confirmationResult) {
+        console.error('confirmationResult is null in verifyOtp!');
+        throw new Error('لم يتم إرسال كود التحقق أو انتهت جلسة العمل، يرجى إعادة المحاولة');
+      }
+      
+      const trimmedOtp = otp.trim();
+      console.log('OTP details:', {
+        otp: trimmedOtp,
+        type: typeof trimmedOtp,
+        length: trimmedOtp.length,
+        hasConfirmationResult: !!confirmationResult
+      });
+      
+      if (typeof trimmedOtp !== 'string') {
+        throw new Error('رمز التحقق يجب أن يكون نصاً');
+      }
+
+      console.log('Calling confirmationResult.confirm with OTP:', trimmedOtp);
+      const result = await confirmationResult.confirm(trimmedOtp);
+      console.log('OTP confirmed, user UID:', result.user?.uid);
+      
+      // Auto-clear result after success
       setConfirmationResult(null);
+      return;
     } catch (error: any) {
       console.error('OTP Verification Error:', error);
-      throw new Error('كود التحقق غير صحيح أو انتهت صلاحيته');
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
+      if (error.code === 'auth/invalid-verification-code') {
+        throw new Error('كود التحقق غير صحيح، يرجى المحاولة مرة أخرى');
+      }
+      if (error.code === 'auth/code-expired') {
+        throw new Error('انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد');
+      }
+      
+      if (error.code === 'auth/argument-error') {
+        throw new Error('حدث خطأ في عملية التحقق، يرجى إعادة إرسال الكود');
+      }
+      
+      throw new Error(error.message || 'فشل التحقق من الكود');
     }
   };
 

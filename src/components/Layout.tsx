@@ -258,7 +258,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </svg>
       </a>
 
-      {/* Footer removed from here as it's now inside main */}
+      {/* Firebase Phone Auth reCAPTCHA container - globally available */}
+      <div id="recaptcha-container"></div>
     </div>
   );
 }
