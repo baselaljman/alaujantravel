@@ -259,7 +259,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </a>
 
       {/* Firebase Phone Auth reCAPTCHA container - globally available */}
-      <div id="recaptcha-container"></div>
+      <div id="recaptcha-container" style={{ position: 'fixed', bottom: 0, right: 0, zIndex: 9999 }}></div>
     </div>
   );
 }

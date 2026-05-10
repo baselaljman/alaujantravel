@@ -13,7 +13,7 @@ import {
   PhoneAuthProvider,
   signInWithCustomToken,
   RecaptchaVerifier,
-  User as User,
+  User,
   ConfirmationResult
 } from 'firebase/auth';
 import { 
@@ -201,40 +201,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setupRecaptcha = async (containerId: string = 'recaptcha-container') => {
     try {
-      console.log('--- Setup Recaptcha Debug ---');
+      console.log('--- setupRecaptcha Start ---');
       
       if (typeof window === 'undefined') return null;
       
-      if (!auth || typeof auth.onAuthStateChanged !== 'function') {
-        console.error('Auth instance is invalid!', auth);
-        throw new Error('مشكلة في تهيئة Firebase Auth');
-      }
-
-      // Ensure the container exists
       const element = document.getElementById(containerId);
       if (!element) {
         console.error(`Recaptcha container element not found: ${containerId}`);
         throw new Error(`لم يتم العثور على عنصر التحقق (reCAPTCHA) بالمعرف: ${containerId}`);
       }
 
-      // If we already have a verifier, try to reuse it
+      // If we have an existing verifier, try to clear it
       if (recaptchaVerifier) {
-        console.log('Reusing existing RecaptchaVerifier');
-        // Check if the verifier's element is still in the DOM
-        return recaptchaVerifier;
+        console.log('Clearing existing verifier');
+        try { recaptchaVerifier.clear(); } catch (e) {}
       }
 
-      // Clear the container content to avoid "container is not empty" errors
+      // Ensure dry element
       element.innerHTML = '';
 
-      console.log('Instantiating new RecaptchaVerifier with element...');
-      // By passing the element directly, we avoid some potential string ID lookup issues.
-      // We are removing the explicit sitekey because it's causing "Invalid site key" errors on this domain.
-      // Firebase will use the default sitekey associated with your project.
+      console.log('Creating new RecaptchaVerifier');
+      // SIGNATURE: new RecaptchaVerifier(auth, element, parameters)
       const verifier = new RecaptchaVerifier(auth, element, {
         size: 'invisible',
-        callback: () => {
-          console.log('reCAPTCHA solved successfully');
+        callback: (response: any) => {
+          console.log('reCAPTCHA solved successfully', !!response);
         },
         'expired-callback': () => {
           console.log('reCAPTCHA expired');
@@ -242,14 +233,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
       
-      console.log('RecaptchaVerifier instantiated, rendering...');
-      await verifier.render();
-      console.log('RecaptchaVerifier rendered successfully');
-      
       setRecaptchaVerifier(verifier);
       return verifier;
     } catch (error: any) {
-      console.error('setupRecaptcha Critical Failure:', error);
+      console.error('setupRecaptcha Error:', error);
       throw error;
     }
   };
@@ -274,7 +261,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const verifier = await setupRecaptcha(recaptchaContainerId);
       if (!verifier) throw new Error('فشل تهيئة مدقق التحقق');
       
-      console.log('Calling signInWithPhoneNumber with phone:', finalPhone);
+      console.log('Calling signInWithPhoneNumber with details:', {
+        phone: finalPhone,
+        verifierType: typeof verifier,
+        isVerifierObject: !!verifier
+      });
       const result = await signInWithPhoneNumber(auth, finalPhone, verifier);
       console.log('signInWithPhoneNumber Success');
       setConfirmationResult(result);
@@ -295,54 +286,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const verifyOtp = async (otp: string) => {
     try {
-      console.log('--- VerifyOtp Start ---');
-      console.log('OTP being verified:', otp);
+      console.log('--- verifyOtp Start ---');
       
-      if (!otp || typeof otp !== 'string' || otp.trim().length === 0) {
+      if (!otp) {
         throw new Error('يرجى إدخال رمز التحقق');
       }
       
-      if (!confirmationResult) {
-        console.error('confirmationResult is null in verifyOtp!');
-        throw new Error('لم يتم إرسال كود التحقق أو انتهت جلسة العمل، يرجى إعادة المحاولة');
-      }
-      
       const trimmedOtp = otp.trim();
-      console.log('OTP details:', {
-        otp: trimmedOtp,
-        type: typeof trimmedOtp,
-        length: trimmedOtp.length,
-        hasConfirmationResult: !!confirmationResult
-      });
-      
-      if (typeof trimmedOtp !== 'string') {
-        throw new Error('رمز التحقق يجب أن يكون نصاً');
+      if (trimmedOtp.length < 6) {
+        throw new Error('رمز التحقق يجب أن يكون 6 أرقام');
       }
-
-      console.log('Calling confirmationResult.confirm with OTP:', trimmedOtp);
-      const result = await confirmationResult.confirm(trimmedOtp);
-      console.log('OTP confirmed, user UID:', result.user?.uid);
       
-      // Auto-clear result after success
+      if (!confirmationResult || typeof confirmationResult.confirm !== 'function') {
+        console.error('confirmationResult is not valid:', confirmationResult);
+        throw new Error('انتهت جلسة التحقق، يرجى إعادة طلب الرمز');
+      }
+      
+      console.log('Attempting to confirm OTP');
+      const result = await confirmationResult.confirm(trimmedOtp);
+      console.log('Login successful, UID:', result.user?.uid);
+      
       setConfirmationResult(null);
       return;
     } catch (error: any) {
-      console.error('OTP Verification Error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
+      console.error('verifyOtp Error:', error);
       
       if (error.code === 'auth/invalid-verification-code') {
-        throw new Error('كود التحقق غير صحيح، يرجى المحاولة مرة أخرى');
+        throw new Error('رمز التحقق غير صحيح');
       }
       if (error.code === 'auth/code-expired') {
-        throw new Error('انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد');
+        throw new Error('انتهى مفعول رمز التحقق، اطلب رمزاً جديداً');
       }
       
-      if (error.code === 'auth/argument-error') {
-        throw new Error('حدث خطأ في عملية التحقق، يرجى إعادة إرسال الكود');
-      }
-      
-      throw new Error(error.message || 'فشل التحقق من الكود');
+      throw new Error(error.message || 'فشل التحقق من الرمز');
     }
   };
 
