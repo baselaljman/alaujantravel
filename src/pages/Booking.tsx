@@ -12,7 +12,7 @@ import { Capacitor } from '@capacitor/core';
 import { useSearchParams } from 'react-router-dom';
 
 export default function BookingPage() {
-  const { user, profile, login, signInWithPhone, verifyOtp } = useAuth();
+  const { user, profile, login, signInWithPhone, verifyOtp, loginWithEmail, registerWithEmail } = useAuth();
   const { formatPrice } = useCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -40,6 +40,9 @@ export default function BookingPage() {
   }, [user, profile]);
 
   const [contactEmail, setContactEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [syriaAuthMode, setSyriaAuthMode] = useState<'login' | 'register'>('register');
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'later'>('later');
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<Booking[]>([]);
@@ -234,7 +237,36 @@ export default function BookingPage() {
       alert('يرجى إكمال بيانات جميع الركاب');
       return;
     }
+    // Pre-fill email if user is logged in
+    if (user?.email && !contactEmail) {
+      setContactEmail(user.email);
+    }
     setStep('contact');
+  };
+
+  const handleSyriaAuth = async () => {
+    setLoading(true);
+    try {
+      if (syriaAuthMode === 'register') {
+        if (!name || !contactEmail || !password || !contactPhone) throw new Error('يرجى إكمال جميع الحقول');
+        await registerWithEmail(contactEmail, password, name);
+        // After registration, update the profile with the phone number
+        if (auth.currentUser) {
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          await updateDoc(userRef, { 
+            phoneNumber: `+963${contactPhone.replace(/^0+/, '')}` 
+          });
+        }
+      } else {
+        if (!contactEmail || !password) throw new Error('يرجى إدخال البريد وكلمة المرور');
+        await loginWithEmail(contactEmail, password);
+      }
+      setIsPhoneVerified(true);
+    } catch (error: any) {
+      alert(error.message || 'حدث خطأ في المصادقة');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendOTP = async () => {
@@ -471,11 +503,11 @@ export default function BookingPage() {
             <p className="text-sm text-stone-500 text-center">يرجى إدخال بيانات التواصل معك بخصوص الرحلة</p>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs text-stone-500">رقم الهاتف</label>
+                <label className="text-xs text-stone-500 font-bold">رقم التواصل (واتساب)</label>
                 <div className="flex gap-2">
                   <input 
                     type="tel" 
-                    placeholder="05xxxxxxxx" 
+                    placeholder={countryCode === '+963' ? '09xxxxxxxx' : '05xxxxxxxx'}
                     value={contactPhone}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '');
@@ -486,7 +518,17 @@ export default function BookingPage() {
                   />
                   <select 
                     value={countryCode} 
-                    onChange={(e) => setCountryCode(e.target.value)}
+                    onChange={(e) => {
+                      setCountryCode(e.target.value);
+                      // Clear verification states when country changes
+                      setOtpSent(false);
+                      setOtpCode('');
+                      if (e.target.value === '+963' && user) {
+                        setIsPhoneVerified(true);
+                      } else if (e.target.value !== '+963' && !user?.phoneNumber) {
+                        setIsPhoneVerified(false);
+                      }
+                    }}
                     className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none min-w-[120px]"
                   >
                     <option value="+966">السعودية 🇸🇦</option>
@@ -504,74 +546,162 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              {/* OTP section for verification */}
-              {!otpSent && !isPhoneVerified && (
-                <button 
-                  onClick={sendOTP}
-                  disabled={!contactPhone || loading}
-                  className="w-full bg-emerald-50 text-emerald-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                >
-                  {loading ? 'جاري الإرسال...' : 'إرسال رمز التحقق (OTP)'}
-                </button>
-              )}
+              {countryCode === '+963' ? (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 text-amber-700 p-3 rounded-xl text-[10px] text-center border border-amber-100 leading-relaxed font-bold">
+                    لعملاء سوريا الحبيبة: يرجى إكمال البيانات التالية لإنشاء حسابك وتأكيد حجزك بسهولة. التحقق عبر الرسائل غير مطلوب لسوريا.
+                  </div>
 
-              {otpSent && !isPhoneVerified && (
-                <div className="space-y-4 p-4 bg-stone-50 rounded-2xl border border-stone-100">
-                  <div className="space-y-2">
-                    <label className="text-xs text-stone-500">أدخل رمز التحقق المرسل لهاتفك</label>
-                    <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        maxLength={6}
-                        placeholder="000000" 
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                        className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-3 text-center text-xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                  {!user ? (
+                    <div className="space-y-4 border-t pt-4">
+                      <div className="flex gap-2 bg-stone-100 p-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setSyriaAuthMode('register')}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${syriaAuthMode === 'register' ? 'bg-white shadow-sm text-emerald-600' : 'text-stone-500'}`}
+                        >
+                          إنشاء حساب
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSyriaAuthMode('login')}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${syriaAuthMode === 'login' ? 'bg-white shadow-sm text-emerald-600' : 'text-stone-500'}`}
+                        >
+                          تسجيل دخول
+                        </button>
+                      </div>
+
+                      {syriaAuthMode === 'register' && (
+                        <input
+                          type="text"
+                          placeholder="الاسم الكامل"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      )}
+
+                      <input
+                        type="email"
+                        placeholder="البريد الإلكتروني"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                       />
-                      <button 
-                        onClick={verifyOTP}
-                        disabled={otpCode.length < 6 || loading}
-                        className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all"
+
+                      <input
+                        type="password"
+                        placeholder="كلمة المرور"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+
+                      <button
+                        onClick={handleSyriaAuth}
+                        disabled={loading}
+                        className="w-full btn-primary py-3"
                       >
-                        {loading ? '...' : 'تأكيد'}
+                        {loading ? 'جاري المعالجة...' : syriaAuthMode === 'register' ? 'إنشاء حساب ومتابعة' : 'دخول ومتابعة'}
                       </button>
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center px-1">
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <label className="text-xs text-stone-500">البريد الإلكتروني</label>
+                        <input
+                          type="email"
+                          value={contactEmail}
+                          onChange={(e) => setContactEmail(e.target.value)}
+                          className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 text-emerald-700 font-bold bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <CheckCircle size={16} />
+                        <span>تم التحقق عبر البريد الإلكتروني</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* OTP section for verification */}
+                  {!otpSent && !isPhoneVerified && (
                     <button 
                       onClick={sendOTP}
-                      className="text-xs text-stone-400 hover:text-emerald-600 underline"
+                      disabled={!contactPhone || loading}
+                      className="w-full bg-emerald-50 text-emerald-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                     >
-                      إعادة إرسال الرمز؟
+                      {loading ? 'جاري الإرسال...' : 'إرسال رمز التحقق (OTP)'}
                     </button>
-                    <button 
-                      onClick={() => { setOtpSent(false); setOtpCode(''); }}
-                      className="text-xs text-stone-400 hover:text-red-500"
-                    >
-                      تغيير الرقم
-                    </button>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {isPhoneVerified && (
-                <div className="flex items-center gap-3 text-emerald-700 font-bold bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                  <div className="bg-emerald-500 text-white rounded-full p-1">
-                    <CheckCircle size={16} />
-                  </div>
-                  <span>تم التحقق من رقم الهاتف بنجاح</span>
-                </div>
-              )}
+                  {otpSent && !isPhoneVerified && (
+                    <div className="space-y-4 p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                      <div className="space-y-2">
+                        <label className="text-xs text-stone-500">أدخل رمز التحقق المرسل لهاتفك</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            maxLength={6}
+                            placeholder="000000" 
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-3 text-center text-xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                          />
+                          <button 
+                            onClick={verifyOTP}
+                            disabled={otpCode.length < 6 || loading}
+                            className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                          >
+                            {loading ? '...' : 'تأكيد'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center px-1">
+                        <button 
+                          onClick={sendOTP}
+                          className="text-xs text-stone-400 hover:text-emerald-600 underline"
+                        >
+                          إعادة إرسال الرمز؟
+                        </button>
+                        <button 
+                          onClick={() => { setOtpSent(false); setOtpCode(''); }}
+                          className="text-xs text-stone-400 hover:text-red-500"
+                        >
+                          تغيير الرقم
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-              {/* No reCAPTCHA needed for custom OTP */}
+                  {isPhoneVerified && (
+                    <div className="flex items-center gap-3 text-emerald-700 font-bold bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                      <div className="bg-emerald-500 text-white rounded-full p-1">
+                        <CheckCircle size={16} />
+                      </div>
+                      <span>تم التحقق من رقم الهاتف بنجاح</span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+
+            <div id="recaptcha-container"></div>
+            
             <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100/50 space-y-2 text-sm">
               <div className="flex justify-between"><span>عدد المقاعد:</span><span className="font-bold">{selectedSeats.length}</span></div>
               <div className="flex justify-between"><span>المبلغ الإجمالي:</span><span className="font-black text-emerald-600">{formatPrice(getTripPrice(selectedTrip).value * selectedSeats.length)}</span></div>
             </div>
             <button 
-              disabled={!isPhoneVerified || loading}
-              onClick={() => setStep('payment')}
+              disabled={(!isPhoneVerified && (countryCode !== '+963' || !user)) || loading}
+              onClick={() => {
+                if (countryCode === '+963' && !user) {
+                  alert('يرجى تسجيل الدخول أو إنشاء حساب للمتابعة');
+                  return;
+                }
+                setStep('payment');
+              }}
               className="btn-primary w-full disabled:opacity-50 py-4 text-lg"
             >
               التالي: تأكيد وعملية الدفع

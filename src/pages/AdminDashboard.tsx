@@ -173,7 +173,7 @@ export default function AdminDashboard() {
               <tr>
                 <th>#</th>
                 <th>اسم الراكب</th>
-                <th>رقم الهاتف</th>
+                <th>رقم التواصل</th>
                 <th>رقم الجواز</th>
                 <th>المقعد</th>
                 <th>الوجهة</th>
@@ -210,6 +210,85 @@ export default function AdminDashboard() {
     printWindow.document.write(html);
     printWindow.document.close();
   };
+  const handlePrintTripParcels = (trip: Trip, tripParcels: Parcel[]) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <html dir="rtl">
+        <head>
+          <title>كشف شحنات الرحلة - ${trip.from} إلى ${trip.to}</title>
+          <style>
+            body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: right; font-size: 14px; }
+            th { background-color: #f8f9fa; color: #059669; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #059669; padding-bottom: 20px; }
+            .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 14px; }
+            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
+            .price-total { text-align: left; margin-top: 20px; font-weight: bold; font-size: 16px; color: #059669; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>كشف شحنات الرحلة</h1>
+            <p>العوجان للسياحة والسفر</p>
+          </div>
+          <div class="trip-info">
+            <div><strong>من:</strong> ${trip.from}</div>
+            <div><strong>إلى:</strong> ${trip.to}</div>
+            <div><strong>التاريخ:</strong> ${formatDateArabic(trip.date)}</div>
+            <div><strong>الوقت:</strong> ${trip.time}</div>
+            <div><strong>رقم تتبع الرحلة:</strong> ${trip.trackingNumber || '---'}</div>
+            <div><strong>عدد الشحنات:</strong> ${tripParcels.length}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>رقم البوليصة</th>
+                <th>المرسل</th>
+                <th>المستلم</th>
+                <th>الملاحظات</th>
+                <th>السعر</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tripParcels.map((p, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${p.waybillNumber}</td>
+                  <td>${p.senderName}<br/><small>${p.senderPhone}</small></td>
+                  <td>${p.receiverName}<br/><small>${p.receiverPhone}</small></td>
+                  <td>${p.note || '---'}</td>
+                  <td>${p.price?.toLocaleString('ar-EG')} ${p.currency === 'SYP' ? 'ل.س' : 'ريال'}</td>
+                  <td>${p.status === 'pending' ? 'قيد الانتظار' : p.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="price-total">
+            إجمالي SAR: ${tripParcels.filter(p => p.currency === 'SAR').reduce((acc, p) => acc + (p.price || 0), 0).toLocaleString('ar-EG')} ريال<br/>
+            إجمالي SYP: ${tripParcels.filter(p => p.currency === 'SYP').reduce((acc, p) => acc + (p.price || 0), 0).toLocaleString('ar-EG')} ل.س
+          </div>
+          <div class="footer">
+            تم استخراج هذا الكشف بتاريخ ${new Date().toLocaleString('ar-EG')}
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              window.onafterprint = () => window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const [editBookingData, setEditBookingData] = useState({
     passengerName: '',
     passengerPhone: '',
@@ -1355,10 +1434,10 @@ export default function AdminDashboard() {
                   <div className="overflow-x-auto card p-0">
                     <table className="w-full text-right">
                       <thead className="bg-stone-50 border-b">
-                        <tr className="text-xs text-stone-400 uppercase">
-                          <th className="p-4">المسافر</th>
-                          <th className="p-4">رقم الجواز</th>
-                          <th className="p-4">المقعد</th>
+                <tr className="text-xs text-stone-400 uppercase">
+                  <th className="p-4">المسافر</th>
+                  <th className="p-4">رقم الجواز</th>
+                  <th className="p-4">المقعد</th>
                           <th className="p-4">طريقة الدفع</th>
                           <th className="p-4">الحالة</th>
                           <th className="p-4">الإجراءات</th>
@@ -1375,12 +1454,14 @@ export default function AdminDashboard() {
                                     value={editBookingData.passengerName} 
                                     onChange={e => setEditBookingData({...editBookingData, passengerName: e.target.value})}
                                     className="bg-white border p-1 rounded w-full text-xs"
+                                    placeholder="الاسم"
                                   />
                                   <input 
                                     type="tel" 
                                     value={editBookingData.passengerPhone} 
                                     onChange={e => setEditBookingData({...editBookingData, passengerPhone: e.target.value})}
                                     className="bg-white border p-1 rounded w-full text-xs"
+                                    placeholder="رقم الهاتف"
                                   />
                                 </div>
                               ) : (
@@ -1917,89 +1998,161 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="card p-0 overflow-hidden">
-                <table className="w-full text-right">
-                  <thead className="bg-stone-50 border-b">
-                    <tr className="text-xs text-stone-400 uppercase">
-                      <th className="p-4">رقم بوليصة الشحن</th>
-                      <th className="p-4">المرسل والمستلم</th>
-                      <th className="p-4">المسار</th>
-                      <th className="p-4">السعر</th>
-                      <th className="p-4">الحالة</th>
-                      <th className="p-4">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {parcels
-                      .filter(p => {
-                        const s = parcelSearch.toLowerCase();
-                        return !s || 
-                          p.waybillNumber?.toLowerCase().includes(s) ||
-                          p.trackingNumber?.toLowerCase().includes(s) ||
-                          p.senderName.toLowerCase().includes(s) ||
-                          p.receiverName.toLowerCase().includes(s) ||
-                          p.senderPhone.includes(s) ||
-                          p.receiverPhone.includes(s);
-                      })
-                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                      .map(parcel => (
-                      <tr key={parcel.id} className="text-sm hover:bg-stone-50 transition-colors">
-                        <td className="p-4 font-mono font-bold text-emerald-600">{parcel.waybillNumber}</td>
-                        <td className="p-4">
-                          <div className="space-y-1">
-                            <p><span className="text-stone-400">من:</span> {parcel.senderName}</p>
-                            <p><span className="text-stone-400">إلى:</span> {parcel.receiverName}</p>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <p className="font-bold">{parcel.from} ➔ {parcel.to}</p>
-                          <p className="text-xs text-stone-400">{new Date(parcel.createdAt).toLocaleDateString('ar-EG')}</p>
-                        </td>
-                        <td className="p-4 font-bold text-emerald-600">
-                          {parcel.price?.toLocaleString('ar-EG')} {parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}
-                        </td>
-                        <td className="p-4">
-                          <select 
-                            value={parcel.status} 
-                            onChange={async (e) => await updateDoc(doc(db, 'parcels', parcel.id), { status: e.target.value })}
-                            className={`px-2 py-1 rounded-lg text-xs font-bold outline-none ${
-                              parcel.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                              parcel.status === 'shipped' ? 'bg-blue-100 text-blue-600' :
-                              'bg-emerald-100 text-emerald-600'
-                            }`}
-                          >
-                            <option value="pending">قيد الانتظار</option>
-                            <option value="shipped">تم الشحن</option>
-                            <option value="delivered">تم التسليم</option>
-                          </select>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => handlePrintParcelInvoice(parcel)}
-                              className="p-2 text-stone-400 hover:text-emerald-600 transition-colors"
-                              title="طباعة الفاتورة"
-                            >
-                              <Printer size={18} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)}
-                              className="p-2 text-stone-400 hover:text-red-500 transition-colors"
-                              title="حذف"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {parcels.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-10 text-center text-stone-400">لا يوجد شحنات مسجلة حالياً.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="space-y-6">
+                {trips.filter(t => parcels.some(p => p.tripId === t.id)).map(trip => {
+                  const tripParcels = parcels.filter(p => p.tripId === trip.id)
+                    .filter(p => {
+                      const s = parcelSearch.toLowerCase();
+                      return !s || 
+                        p.waybillNumber?.toLowerCase().includes(s) ||
+                        p.senderName.toLowerCase().includes(s) ||
+                        p.receiverName.toLowerCase().includes(s) ||
+                        p.senderPhone.includes(s) ||
+                        p.receiverPhone.includes(s);
+                    });
+
+                  if (tripParcels.length === 0 && parcelSearch) return null;
+
+                  return (
+                    <div key={trip.id} className="card p-0 overflow-hidden border-emerald-100 border-2">
+                      <div className="bg-emerald-50 p-4 border-b flex justify-between items-center">
+                        <div>
+                          <h4 className="font-bold text-emerald-800">{trip.from} ➔ {trip.to}</h4>
+                          <p className="text-xs text-emerald-600">{formatDateArabic(trip.date)} - {trip.time} ({trip.trackingNumber})</p>
+                        </div>
+                        <button 
+                          onClick={() => handlePrintTripParcels(trip, tripParcels)}
+                          className="flex items-center gap-2 bg-white text-emerald-600 px-4 py-2 rounded-xl text-xs font-bold shadow-sm hover:shadow-md transition-all"
+                        >
+                          <Printer size={16} />
+                          طباعة كشف الشحنات
+                        </button>
+                      </div>
+                      <table className="w-full text-right">
+                        <thead className="bg-stone-50 border-b">
+                          <tr className="text-xs text-stone-400 uppercase">
+                            <th className="p-4">رقم بوليصة الشحن</th>
+                            <th className="p-4">المرسل والمستلم</th>
+                            <th className="p-4">السعر</th>
+                            <th className="p-4">الحالة</th>
+                            <th className="p-4">الإجراءات</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {tripParcels.map(parcel => (
+                            <tr key={parcel.id} className="text-sm hover:bg-stone-50 transition-colors">
+                              <td className="p-4 font-mono font-bold text-emerald-600">{parcel.waybillNumber}</td>
+                              <td className="p-4">
+                                <div className="space-y-1">
+                                  <p><span className="text-stone-400">من:</span> {parcel.senderName}</p>
+                                  <p><span className="text-stone-400">إلى:</span> {parcel.receiverName}</p>
+                                </div>
+                              </td>
+                              <td className="p-4 font-bold text-emerald-600">
+                                {parcel.price?.toLocaleString('ar-EG')} {parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}
+                              </td>
+                              <td className="p-4">
+                                <select 
+                                  value={parcel.status} 
+                                  onChange={async (e) => await updateDoc(doc(db, 'parcels', parcel.id), { status: e.target.value })}
+                                  className={`px-2 py-1 rounded-lg text-xs font-bold outline-none ${
+                                    parcel.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                    parcel.status === 'shipped' ? 'bg-blue-100 text-blue-600' :
+                                    'bg-emerald-100 text-emerald-600'
+                                  }`}
+                                >
+                                  <option value="pending">قيد الانتظار</option>
+                                  <option value="shipped">تم الشحن</option>
+                                  <option value="delivered">تم التسليم</option>
+                                </select>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => handlePrintParcelInvoice(parcel)}
+                                    className="p-2 text-stone-400 hover:text-emerald-600 transition-colors"
+                                    title="طباعة الفاتورة"
+                                  >
+                                    <Printer size={18} />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)}
+                                    className="p-2 text-stone-400 hover:text-red-500 transition-colors"
+                                    title="حذف"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
+
+                {parcels.length === 0 && (
+                  <div className="card p-10 text-center text-stone-400">لا يوجد شحنات مسجلة حالياً.</div>
+                )}
+                
+                {parcels.some(p => !p.tripId) && (
+                  <div className="card p-0 overflow-hidden border-stone-100 border-2 mt-8">
+                    <div className="bg-stone-50 p-4 border-b">
+                      <h4 className="font-bold text-stone-600">شحنات عامة (غير مرتبطة برحلة)</h4>
+                    </div>
+                    <table className="w-full text-right">
+                      <thead className="bg-stone-50 border-b">
+                        <tr className="text-xs text-stone-400 uppercase">
+                          <th className="p-4">رقم بوليصة الشحن</th>
+                          <th className="p-4">المرسل والمستلم</th>
+                          <th className="p-4">المسار</th>
+                          <th className="p-4">السعر</th>
+                          <th className="p-4">الحالة</th>
+                          <th className="p-4">الإجراءات</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {parcels.filter(p => !p.tripId).map(parcel => (
+                          <tr key={parcel.id} className="text-sm hover:bg-stone-50 transition-colors">
+                            <td className="p-4 font-mono font-bold text-emerald-600">{parcel.waybillNumber}</td>
+                            <td className="p-4">
+                              <p><span className="text-stone-400">من:</span> {parcel.senderName}</p>
+                              <p><span className="text-stone-400">إلى:</span> {parcel.receiverName}</p>
+                            </td>
+                            <td className="p-4">
+                              <p className="font-bold">{parcel.from} ➔ {parcel.to}</p>
+                            </td>
+                            <td className="p-4 font-bold">
+                              {parcel.price?.toLocaleString('ar-EG')} {parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}
+                            </td>
+                            <td className="p-4">
+                                <select 
+                                  value={parcel.status} 
+                                  onChange={async (e) => await updateDoc(doc(db, 'parcels', parcel.id), { status: e.target.value })}
+                                  className="px-2 py-1 rounded-lg text-xs font-bold bg-stone-100 text-stone-600"
+                                >
+                                  <option value="pending">قيد الانتظار</option>
+                                  <option value="shipped">تم الشحن</option>
+                                  <option value="delivered">تم التسليم</option>
+                                </select>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => handlePrintParcelInvoice(parcel)} className="p-2 text-stone-400 hover:text-emerald-600">
+                                  <Printer size={18} />
+                                </button>
+                                <button onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)} className="p-2 text-stone-400 hover:text-red-500">
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
