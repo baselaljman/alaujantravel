@@ -301,7 +301,7 @@ export default function BookingPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 px-4 sm:px-6">
       <div className="flex flex-col items-center gap-6">
         <h1 className="text-3xl font-bold text-center">
           {searchParams.get('type') === 'umrah' ? 'حجز رحلة عمرة' : 
@@ -773,8 +773,9 @@ export default function BookingPage() {
                   borderWidth: '2px',
                   borderStyle: 'solid',
                   borderRadius: '24px',
-                  padding: '32px',
-                  width: '400px',
+                  padding: '24px',
+                  width: '100%',
+                  maxWidth: '400px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '24px',
