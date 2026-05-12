@@ -514,7 +514,7 @@ export default function BookingPage() {
                         const val = e.target.value.replace(/\D/g, '');
                         setContactPhone(val.startsWith('0') ? val.substring(1) : val);
                       }}
-                      className="flex-1 bg-transparent px-4 py-3 text-lg outline-none text-left font-mono tracking-wider"
+                      className="flex-1 min-w-0 bg-transparent px-4 py-3 text-lg outline-none text-left font-mono tracking-wider"
                       dir="ltr"
                     />
                     <select 
@@ -529,7 +529,7 @@ export default function BookingPage() {
                           setIsPhoneVerified(false);
                         }
                       }}
-                      className="bg-white border-r border-stone-100 rounded-xl px-2 py-3 text-xs outline-none w-[115px] shrink-0 font-bold ml-10"
+                      className="bg-white border-r border-stone-100 rounded-xl px-2 py-3 text-[10px] sm:text-xs outline-none w-[105px] sm:w-[115px] shrink-0 font-bold ml-1"
                     >
                       <option value="+966">السعودية 🇸🇦</option>
                       <option value="+971">الإمارات 🇦🇪</option>
