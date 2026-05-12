@@ -529,7 +529,7 @@ export default function BookingPage() {
                           setIsPhoneVerified(false);
                         }
                       }}
-                      className="bg-white border-r border-stone-100 rounded-xl px-2 py-3 text-xs outline-none w-[115px] shrink-0 font-bold ml-1"
+                      className="bg-white border-r border-stone-100 rounded-xl px-2 py-3 text-xs outline-none w-[115px] shrink-0 font-bold ml-10"
                     >
                       <option value="+966">السعودية 🇸🇦</option>
                       <option value="+971">الإمارات 🇦🇪</option>

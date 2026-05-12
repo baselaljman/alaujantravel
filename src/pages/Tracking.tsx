@@ -212,7 +212,7 @@ export default function TrackingPage() {
             className="bg-emerald-600 text-white flex items-center justify-center gap-3 py-4 px-10 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 w-full md:w-auto shrink-0"
           >
             <Search size={22} />
-            <span className="whitespace-nowrap">تتبع الطلب</span>
+            <span className="whitespace-nowrap mr-1">تتبع</span>
           </button>
         </div>
 
