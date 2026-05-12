@@ -504,45 +504,46 @@ export default function BookingPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs text-stone-500 font-bold">رقم التواصل (واتساب)</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="tel" 
-                    placeholder={countryCode === '+963' ? '09xxxxxxxx' : '05xxxxxxxx'}
-                    value={contactPhone}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      setContactPhone(val.startsWith('0') ? val.substring(1) : val);
-                    }}
-                    className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-left"
-                    dir="ltr"
-                  />
-                  <select 
-                    value={countryCode} 
-                    onChange={(e) => {
-                      setCountryCode(e.target.value);
-                      // Clear verification states when country changes
-                      setOtpSent(false);
-                      setOtpCode('');
-                      if (e.target.value === '+963' && user) {
-                        setIsPhoneVerified(true);
-                      } else if (e.target.value !== '+963' && !user?.phoneNumber) {
-                        setIsPhoneVerified(false);
-                      }
-                    }}
-                    className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none min-w-[120px]"
-                  >
-                    <option value="+966">السعودية 🇸🇦</option>
-                    <option value="+971">الإمارات 🇦🇪</option>
-                    <option value="+965">الكويت 🇰🇼</option>
-                    <option value="+974">قطر 🇶🇦</option>
-                    <option value="+973">البحرين 🇧🇭</option>
-                    <option value="+968">عمان 🇴🇲</option>
-                    <option value="+962">الأردن 🇯🇴</option>
-                    <option value="+961">لبنان 🇱🇧</option>
-                    <option value="+963">سوريا 🇸🇾</option>
-                    <option value="+964">العراق 🇮🇶</option>
-                    <option value="+967">اليمن 🇾🇪</option>
-                  </select>
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-2 items-center">
+                    <select 
+                      value={countryCode} 
+                      onChange={(e) => {
+                        setCountryCode(e.target.value);
+                        setOtpSent(false);
+                        setOtpCode('');
+                        if (e.target.value === '+963' && user) {
+                          setIsPhoneVerified(true);
+                        } else if (e.target.value !== '+963' && !user?.phoneNumber) {
+                          setIsPhoneVerified(false);
+                        }
+                      }}
+                      className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-3 text-xs focus:ring-2 focus:ring-emerald-500 outline-none w-[110px] shrink-0"
+                    >
+                      <option value="+966">السعودية 🇸🇦</option>
+                      <option value="+971">الإمارات 🇦🇪</option>
+                      <option value="+965">الكويت 🇰🇼</option>
+                      <option value="+974">قطر 🇶🇦</option>
+                      <option value="+973">البحرين 🇧🇭</option>
+                      <option value="+968">عمان 🇴🇲</option>
+                      <option value="+962">الأردن 🇯🇴</option>
+                      <option value="+961">لبنان 🇱🇧</option>
+                      <option value="+963">سوريا 🇸🇾</option>
+                      <option value="+964">العراق 🇮🇶</option>
+                      <option value="+967">اليمن 🇾🇪</option>
+                    </select>
+                    <input 
+                      type="tel" 
+                      placeholder={countryCode === '+963' ? '09xxxxxxxx' : '05xxxxxxxx'}
+                      value={contactPhone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setContactPhone(val.startsWith('0') ? val.substring(1) : val);
+                      }}
+                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-left font-mono"
+                      dir="ltr"
+                    />
+                  </div>
                 </div>
               </div>
 
