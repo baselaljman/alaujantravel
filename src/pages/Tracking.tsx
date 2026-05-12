@@ -199,17 +199,20 @@ export default function TrackingPage() {
           <Search className="text-emerald-600" />
           تتبع الطرد والرحلات
         </h2>
-        <div className="card flex flex-col sm:flex-row gap-3 sm:gap-4 p-4 sm:p-6">
+        <div className="card flex flex-col md:flex-row gap-4 p-4 sm:p-6 bg-white shadow-xl border-emerald-100/50 border-2">
           <input
             type="text"
             value={trackingNumber}
             onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder="أدخل رقم تتبع الرحلة (wa001) أو رقم بوليصة الشحن (00001)"
-            className="flex-1 bg-stone-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm sm:text-base w-full"
+            placeholder="أدخل رقم التتبع (مثال: wa001)"
+            className="flex-1 bg-stone-50 border border-stone-200 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-lg w-full"
           />
-          <button onClick={handleTrack} className="btn-primary flex items-center justify-center gap-2 py-3 px-8 w-full sm:w-auto">
-            <Search size={20} />
-            تتبع
+          <button 
+            onClick={handleTrack} 
+            className="bg-emerald-600 text-white flex items-center justify-center gap-3 py-4 px-10 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 w-full md:w-auto shrink-0"
+          >
+            <Search size={22} />
+            <span className="whitespace-nowrap">تتبع الطلب</span>
           </button>
         </div>
 

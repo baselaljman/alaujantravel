@@ -505,16 +505,16 @@ export default function BookingPage() {
               <div className="space-y-2">
                 <label className="text-xs text-stone-500 font-bold">رقم التواصل</label>
                 <div className="flex flex-col gap-3">
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center bg-stone-50 border border-stone-200 rounded-2xl p-1 focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
                     <input 
                       type="tel" 
-                      placeholder={countryCode === '+963' ? '09xxxxxxxx' : '05xxxxxxxx'}
+                      placeholder={countryCode === '+963' ? '09xxxxxxxx' : '5xxxxxxxx'}
                       value={contactPhone}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         setContactPhone(val.startsWith('0') ? val.substring(1) : val);
                       }}
-                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-left font-mono"
+                      className="flex-1 bg-transparent px-4 py-3 text-lg outline-none text-left font-mono tracking-wider"
                       dir="ltr"
                     />
                     <select 
@@ -529,7 +529,7 @@ export default function BookingPage() {
                           setIsPhoneVerified(false);
                         }
                       }}
-                      className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-3 text-xs focus:ring-2 focus:ring-emerald-500 outline-none w-[110px] shrink-0"
+                      className="bg-white border-r border-stone-100 rounded-xl px-2 py-3 text-xs outline-none w-[115px] shrink-0 font-bold ml-1"
                     >
                       <option value="+966">السعودية 🇸🇦</option>
                       <option value="+971">الإمارات 🇦🇪</option>
@@ -641,21 +641,22 @@ export default function BookingPage() {
                     <div className="space-y-4 p-4 bg-stone-50 rounded-2xl border border-stone-100">
                       <div className="space-y-2">
                         <label className="text-xs text-stone-500">أدخل رمز التحقق المرسل لهاتفك</label>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-3">
                           <input 
                             type="text" 
                             maxLength={6}
                             placeholder="000000" 
                             value={otpCode}
                             onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-3 text-center text-xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                            className="flex-1 bg-white border-2 border-stone-200 rounded-2xl px-4 py-4 text-center text-2xl tracking-[0.5em] font-mono focus:border-emerald-500 outline-none transition-all shadow-inner"
                           />
                           <button 
                             onClick={verifyOTP}
                             disabled={otpCode.length < 6 || loading}
-                            className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                            className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
                           >
-                            {loading ? '...' : 'تأكيد'}
+                            <CheckCircle size={20} />
+                            <span>{loading ? 'جاري التحقق...' : 'تحقق الآن'}</span>
                           </button>
                         </div>
                       </div>
