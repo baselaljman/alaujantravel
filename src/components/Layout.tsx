@@ -184,7 +184,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           paddingLeft: 'max(1rem, env(safe-area-inset-left))',
           paddingRight: 'max(1rem, env(safe-area-inset-right))' 
         }}
-        className="flex-1 max-w-7xl mx-auto w-full py-4 sm:py-6 overflow-y-auto pb-20 sm:pb-12 min-h-0 bg-stone-50"
+        className="flex-1 max-w-7xl mx-auto w-full py-4 sm:py-6 overflow-y-auto overflow-x-hidden pb-20 sm:pb-12 min-h-0 bg-stone-50"
       >
         {children}
         

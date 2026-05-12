@@ -1201,77 +1201,79 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto card p-0">
-                <table className="w-full text-right">
-                  <thead className="bg-stone-50 border-b">
-                    <tr className="text-xs text-stone-400 uppercase">
-                      <th className="p-4">رقم التتبع</th>
-                      <th className="p-4">الرحلة</th>
-                      <th className="p-4">النوع</th>
-                      <th className="p-4">التاريخ</th>
-                      <th className="p-4">الحافلة</th>
-                      <th className="p-4">السعر (ريال)</th>
-                      <th className="p-4">السعر (ل.س)</th>
-                      <th className="p-4">السائق</th>
-                      <th className="p-4">الحالة</th>
-                      <th className="p-4">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {trips.map(trip => (
-                      <tr key={trip.id} className="text-sm">
-                        <td className="p-4 font-mono font-bold text-emerald-600">{trip.trackingNumber}</td>
-                        <td className="p-4 font-bold">
-                          <div>{trip.from} ← {trip.to}</div>
-                          {trip.stops && trip.stops.length > 0 && (
-                            <div className="text-[10px] text-stone-400 font-normal mt-1 flex flex-wrap gap-1">
-                              <span>المحطات:</span>
-                              {trip.stops.map((s, i) => (
-                                <span key={i} className="bg-stone-100 px-1 rounded">{s.cityName}</span>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-4">
-                          <span className={`text-[10px] px-2 py-1 rounded-full ${trip.tripType === 'umrah' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                            {trip.tripType === 'umrah' ? 'عمرة' : 'دولية'}
-                          </span>
-                        </td>
-                        <td className="p-4">{trip.date} {trip.time}</td>
-                        <td className="p-4">{trip.busNumber}</td>
-                        <td className="p-4 font-bold text-emerald-600">{trip.priceSAR?.toLocaleString() || trip.price?.toLocaleString()} ريال</td>
-                        <td className="p-4 font-bold text-emerald-600">{trip.priceSYP?.toLocaleString()} ل.س</td>
-                        <td className="p-4">
-                          <select 
-                            value={trip.driverId || ''} 
-                            onChange={(e) => updateDoc(doc(db, 'trips', trip.id), { driverId: e.target.value })}
-                            className="bg-stone-100 rounded-lg px-2 py-1 text-xs"
-                          >
-                            <option value="">لا يوجد</option>
-                            {drivers.map(d => <option key={d.uid} value={d.uid}>{d.displayName}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-4">
-                          <select 
-                            value={trip.status} 
-                            onChange={(e) => handleUpdateTripStatus(trip.id, e.target.value)}
-                            className="bg-stone-100 rounded-lg px-2 py-1 text-xs"
-                          >
-                            <option value="scheduled">مجدولة</option>
-                            <option value="active">نشطة</option>
-                            <option value="completed">مكتملة</option>
-                            <option value="cancelled">ملغاة</option>
-                          </select>
-                        </td>
-                        <td className="p-4">
-                          <button onClick={() => handleDeleteRequest('trips', trip.id, `${trip.from} ← ${trip.to}`)} className="text-red-500 p-2 hover:bg-red-50 rounded-lg">
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
+              <div className="overflow-x-auto w-full -mx-4 sm:mx-0">
+                <div className="inline-block min-w-full align-middle">
+                  <table className="min-w-full text-right">
+                    <thead className="bg-stone-50 border-b">
+                      <tr className="text-xs text-stone-400 uppercase">
+                        <th className="p-4 whitespace-nowrap">رقم التتبع</th>
+                        <th className="p-4 whitespace-nowrap">الرحلة</th>
+                        <th className="p-4 whitespace-nowrap">النوع</th>
+                        <th className="p-4 whitespace-nowrap">التاريخ</th>
+                        <th className="p-4 whitespace-nowrap">الحافلة</th>
+                        <th className="p-4 whitespace-nowrap">السعر (ريال)</th>
+                        <th className="p-4 whitespace-nowrap">السعر (ل.س)</th>
+                        <th className="p-4 whitespace-nowrap">السائق</th>
+                        <th className="p-4 whitespace-nowrap">الحالة</th>
+                        <th className="p-4 whitespace-nowrap">الإجراءات</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y">
+                      {trips.map(trip => (
+                        <tr key={trip.id} className="text-sm">
+                          <td className="p-4 font-mono font-bold text-emerald-600">{trip.trackingNumber}</td>
+                          <td className="p-4 font-bold">
+                            <div>{trip.from} ← {trip.to}</div>
+                            {trip.stops && trip.stops.length > 0 && (
+                              <div className="text-[10px] text-stone-400 font-normal mt-1 flex flex-wrap gap-1">
+                                <span>المحطات:</span>
+                                {trip.stops.map((s, i) => (
+                                  <span key={i} className="bg-stone-100 px-1 rounded">{s.cityName}</span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <span className={`text-[10px] px-2 py-1 rounded-full ${trip.tripType === 'umrah' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                              {trip.tripType === 'umrah' ? 'عمرة' : 'دولية'}
+                            </span>
+                          </td>
+                          <td className="p-4 whitespace-nowrap">{trip.date} {trip.time}</td>
+                          <td className="p-4 whitespace-nowrap">{trip.busNumber}</td>
+                          <td className="p-4 font-bold text-emerald-600 whitespace-nowrap">{trip.priceSAR?.toLocaleString() || trip.price?.toLocaleString()} ريال</td>
+                          <td className="p-4 font-bold text-emerald-600 whitespace-nowrap">{trip.priceSYP?.toLocaleString()} ل.س</td>
+                          <td className="p-4">
+                            <select 
+                              value={trip.driverId || ''} 
+                              onChange={(e) => updateDoc(doc(db, 'trips', trip.id), { driverId: e.target.value })}
+                              className="bg-stone-100 rounded-lg px-2 py-1 text-xs"
+                            >
+                              <option value="">لا يوجد</option>
+                              {drivers.map(d => <option key={d.uid} value={d.uid}>{d.displayName}</option>)}
+                            </select>
+                          </td>
+                          <td className="p-4">
+                            <select 
+                              value={trip.status} 
+                              onChange={(e) => handleUpdateTripStatus(trip.id, e.target.value)}
+                              className="bg-stone-100 rounded-lg px-2 py-1 text-xs"
+                            >
+                              <option value="scheduled">مجدولة</option>
+                              <option value="active">نشطة</option>
+                              <option value="completed">مكتملة</option>
+                              <option value="cancelled">ملغاة</option>
+                            </select>
+                          </td>
+                          <td className="p-4">
+                            <button onClick={() => handleDeleteRequest('trips', trip.id, `${trip.from} ← ${trip.to}`)} className="text-red-500 p-2 hover:bg-red-50 rounded-lg">
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1431,18 +1433,19 @@ export default function AdminDashboard() {
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto card p-0">
-                    <table className="w-full text-right">
-                      <thead className="bg-stone-50 border-b">
-                <tr className="text-xs text-stone-400 uppercase">
-                  <th className="p-4">المسافر</th>
-                  <th className="p-4">رقم الجواز</th>
-                  <th className="p-4">المقعد</th>
-                          <th className="p-4">طريقة الدفع</th>
-                          <th className="p-4">الحالة</th>
-                          <th className="p-4">الإجراءات</th>
-                        </tr>
-                      </thead>
+                  <div className="overflow-x-auto w-full -mx-4 sm:mx-0">
+                    <div className="inline-block min-w-full align-middle">
+                      <table className="min-w-full text-right">
+                        <thead className="bg-stone-50 border-b">
+                          <tr className="text-xs text-stone-400 uppercase">
+                            <th className="p-4 whitespace-nowrap">المسافر</th>
+                            <th className="p-4 whitespace-nowrap">رقم الجواز</th>
+                            <th className="p-4 whitespace-nowrap">المقعد</th>
+                            <th className="p-4 whitespace-nowrap">طريقة الدفع</th>
+                            <th className="p-4 whitespace-nowrap">الحالة</th>
+                            <th className="p-4 whitespace-nowrap">الإجراءات</th>
+                          </tr>
+                        </thead>
                       <tbody className="divide-y">
                         {bookings.filter(b => b.tripId === selectedTripId).map(booking => (
                           <tr key={booking.id} className="text-sm">
@@ -1719,7 +1722,8 @@ export default function AdminDashboard() {
                     </table>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
             </motion.div>
           )}
 
@@ -2101,56 +2105,60 @@ export default function AdminDashboard() {
                     <div className="bg-stone-50 p-4 border-b">
                       <h4 className="font-bold text-stone-600">شحنات عامة (غير مرتبطة برحلة)</h4>
                     </div>
-                    <table className="w-full text-right">
-                      <thead className="bg-stone-50 border-b">
-                        <tr className="text-xs text-stone-400 uppercase">
-                          <th className="p-4">رقم بوليصة الشحن</th>
-                          <th className="p-4">المرسل والمستلم</th>
-                          <th className="p-4">المسار</th>
-                          <th className="p-4">السعر</th>
-                          <th className="p-4">الحالة</th>
-                          <th className="p-4">الإجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {parcels.filter(p => !p.tripId).map(parcel => (
-                          <tr key={parcel.id} className="text-sm hover:bg-stone-50 transition-colors">
-                            <td className="p-4 font-mono font-bold text-emerald-600">{parcel.waybillNumber}</td>
-                            <td className="p-4">
-                              <p><span className="text-stone-400">من:</span> {parcel.senderName}</p>
-                              <p><span className="text-stone-400">إلى:</span> {parcel.receiverName}</p>
-                            </td>
-                            <td className="p-4">
-                              <p className="font-bold">{parcel.from} ➔ {parcel.to}</p>
-                            </td>
-                            <td className="p-4 font-bold">
-                              {parcel.price?.toLocaleString('ar-EG')} {parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}
-                            </td>
-                            <td className="p-4">
-                                <select 
-                                  value={parcel.status} 
-                                  onChange={async (e) => await updateDoc(doc(db, 'parcels', parcel.id), { status: e.target.value })}
-                                  className="px-2 py-1 rounded-lg text-xs font-bold bg-stone-100 text-stone-600"
-                                >
-                                  <option value="pending">قيد الانتظار</option>
-                                  <option value="shipped">تم الشحن</option>
-                                  <option value="delivered">تم التسليم</option>
-                                </select>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-2">
-                                <button onClick={() => handlePrintParcelInvoice(parcel)} className="p-2 text-stone-400 hover:text-emerald-600">
-                                  <Printer size={18} />
-                                </button>
-                                <button onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)} className="p-2 text-stone-400 hover:text-red-500">
-                                  <Trash2 size={18} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="overflow-x-auto w-full">
+                      <div className="inline-block min-w-full align-middle">
+                        <table className="min-w-full text-right">
+                          <thead className="bg-stone-50 border-b">
+                            <tr className="text-xs text-stone-400 uppercase">
+                              <th className="p-4 whitespace-nowrap">رقم بوليصة الشحن</th>
+                              <th className="p-4 whitespace-nowrap">المرسل والمستلم</th>
+                              <th className="p-4 whitespace-nowrap">المسار</th>
+                              <th className="p-4 whitespace-nowrap">السعر</th>
+                              <th className="p-4 whitespace-nowrap">الحالة</th>
+                              <th className="p-4 whitespace-nowrap">الإجراءات</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {parcels.filter(p => !p.tripId).map(parcel => (
+                              <tr key={parcel.id} className="text-sm hover:bg-stone-50 transition-colors">
+                                <td className="p-4 font-mono font-bold text-emerald-600">{parcel.waybillNumber}</td>
+                                <td className="p-4 whitespace-nowrap">
+                                  <p><span className="text-stone-400">من:</span> {parcel.senderName}</p>
+                                  <p><span className="text-stone-400">إلى:</span> {parcel.receiverName}</p>
+                                </td>
+                                <td className="p-4 whitespace-nowrap">
+                                  <p className="font-bold">{parcel.from} ➔ {parcel.to}</p>
+                                </td>
+                                <td className="p-4 font-bold whitespace-nowrap">
+                                  {parcel.price?.toLocaleString('ar-EG')} {parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}
+                                </td>
+                                <td className="p-4">
+                                    <select 
+                                      value={parcel.status} 
+                                      onChange={async (e) => await updateDoc(doc(db, 'parcels', parcel.id), { status: e.target.value })}
+                                      className="px-2 py-1 rounded-lg text-xs font-bold bg-stone-100 text-stone-600"
+                                    >
+                                      <option value="pending">قيد الانتظار</option>
+                                      <option value="shipped">تم الشحن</option>
+                                      <option value="delivered">تم التسليم</option>
+                                    </select>
+                                </td>
+                                <td className="p-4">
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => handlePrintParcelInvoice(parcel)} className="p-2 text-stone-400 hover:text-emerald-600">
+                                      <Printer size={18} />
+                                    </button>
+                                    <button onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)} className="p-2 text-stone-400 hover:text-red-500">
+                                      <Trash2 size={18} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
