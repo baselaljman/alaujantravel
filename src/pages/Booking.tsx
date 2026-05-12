@@ -503,9 +503,20 @@ export default function BookingPage() {
             <p className="text-sm text-stone-500 text-center">يرجى إدخال بيانات التواصل معك بخصوص الرحلة</p>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs text-stone-500 font-bold">رقم التواصل (واتساب)</label>
+                <label className="text-xs text-stone-500 font-bold">رقم التواصل</label>
                 <div className="flex flex-col gap-3">
                   <div className="flex gap-2 items-center">
+                    <input 
+                      type="tel" 
+                      placeholder={countryCode === '+963' ? '09xxxxxxxx' : '05xxxxxxxx'}
+                      value={contactPhone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setContactPhone(val.startsWith('0') ? val.substring(1) : val);
+                      }}
+                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-left font-mono"
+                      dir="ltr"
+                    />
                     <select 
                       value={countryCode} 
                       onChange={(e) => {
@@ -532,17 +543,6 @@ export default function BookingPage() {
                       <option value="+964">العراق 🇮🇶</option>
                       <option value="+967">اليمن 🇾🇪</option>
                     </select>
-                    <input 
-                      type="tel" 
-                      placeholder={countryCode === '+963' ? '09xxxxxxxx' : '05xxxxxxxx'}
-                      value={contactPhone}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        setContactPhone(val.startsWith('0') ? val.substring(1) : val);
-                      }}
-                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-left font-mono"
-                      dir="ltr"
-                    />
                   </div>
                 </div>
               </div>
