@@ -248,6 +248,23 @@ export default function Login() {
             ) : !showOtpInput ? (
               <div className="space-y-4">
                 <div className="flex gap-2">
+                  <div className="relative w-1/3">
+                    <select
+                      value={selectedCountry.code}
+                      onChange={(e) => {
+                        const country = countries.find(c => c.code === e.target.value);
+                        if (country) setSelectedCountry(country);
+                      }}
+                      className="w-full bg-stone-100 p-3 pr-2 rounded-xl text-[10px] sm:text-xs outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-right font-bold pl-8 border-l border-stone-200"
+                    >
+                      {countries.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.name} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute left-2 top-3.5 text-stone-400 pointer-events-none" size={14} />
+                  </div>
                   <div className="relative flex-1">
                     <Phone className="absolute right-3 top-3 text-stone-400" size={18} />
                     <input
@@ -262,23 +279,6 @@ export default function Login() {
                       dir="ltr"
                       className="w-full bg-stone-100 p-3 pr-10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-left"
                     />
-                  </div>
-                  <div className="relative w-1/3">
-                    <select
-                      value={selectedCountry.code}
-                      onChange={(e) => {
-                        const country = countries.find(c => c.code === e.target.value);
-                        if (country) setSelectedCountry(country);
-                      }}
-                      className="w-full bg-stone-100 p-3 pr-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-right font-bold pl-8"
-                    >
-                      {countries.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.flag} {c.name} {c.code}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute left-2 top-3.5 text-stone-400 pointer-events-none" size={14} />
                   </div>
                 </div>
                 <p className="text-[10px] text-stone-400 text-center">
@@ -300,8 +300,8 @@ export default function Login() {
               </div>
             )}
  
-             <button
-               type="submit"
+              <button
+                type="submit"
               disabled={loading}
               className="btn-primary w-full py-3 flex items-center justify-center gap-2"
             >
@@ -316,7 +316,7 @@ export default function Login() {
                     </>
                   ) : (
                     <>
-                      <LogIn size={20} />
+                      {showOtpInput ? <CheckCircle2 size={20} /> : <LogIn size={20} />}
                       {showOtpInput ? 'تحقق ودخول' : 'إرسال كود التحقق'}
                     </>
                   )}

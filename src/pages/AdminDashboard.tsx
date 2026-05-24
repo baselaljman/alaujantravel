@@ -156,7 +156,12 @@ export default function AdminDashboard() {
           </style>
         </head>
         <body>
-          <div class="header">
+          <div class="header" style="position: relative;">
+            <img 
+              src="/logoaujantravel.jpeg" 
+              crossorigin="anonymous"
+              style="position: absolute; top: 0; right: 0; width: 60px; height: 60px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+            />
             <h1>كشف ركاب الرحلة</h1>
             <p>العوجان للسياحة والسفر</p>
           </div>
@@ -198,9 +203,24 @@ export default function AdminDashboard() {
             تم استخراج هذا الكشف بتاريخ ${new Date().toLocaleString('ar-EG')}
           </div>
           <script>
-            window.onload = () => {
-              window.print();
-              window.onafterprint = () => window.close();
+            window.onload = function() {
+              const images = document.getElementsByTagName('img');
+              let loaded = 0;
+              if (images.length === 0) {
+                window.print();
+                window.onafterprint = () => window.close();
+                return;
+              }
+              const check = () => {
+                loaded++;
+                if (loaded === images.length) {
+                  setTimeout(() => { window.print(); window.onafterprint = () => window.close(); }, 500);
+                }
+              };
+              for (let img of images) {
+                if (img.complete) check();
+                else { img.onload = check; img.onerror = check; }
+              }
             };
           </script>
         </body>
@@ -230,7 +250,12 @@ export default function AdminDashboard() {
           </style>
         </head>
         <body>
-          <div class="header">
+          <div class="header" style="position: relative;">
+            <img 
+              src="/logoaujantravel.jpeg" 
+              crossorigin="anonymous"
+              style="position: absolute; top: 0; right: 0; width: 60px; height: 60px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+            />
             <h1>كشف شحنات الرحلة</h1>
             <p>العوجان للسياحة والسفر</p>
           </div>
@@ -276,9 +301,24 @@ export default function AdminDashboard() {
             تم استخراج هذا الكشف بتاريخ ${new Date().toLocaleString('ar-EG')}
           </div>
           <script>
-            window.onload = () => {
-              window.print();
-              window.onafterprint = () => window.close();
+            window.onload = function() {
+              const images = document.getElementsByTagName('img');
+              let loaded = 0;
+              if (images.length === 0) {
+                window.print();
+                window.onafterprint = () => window.close();
+                return;
+              }
+              const check = () => {
+                loaded++;
+                if (loaded === images.length) {
+                  setTimeout(() => { window.print(); window.onafterprint = () => window.close(); }, 500);
+                }
+              };
+              for (let img of images) {
+                if (img.complete) check();
+                else { img.onload = check; img.onerror = check; }
+              }
             };
           </script>
         </body>
@@ -388,7 +428,7 @@ export default function AdminDashboard() {
         await Promise.all(updatePromises);
       }
     } catch (error) {
-      console.error('Error updating trip status:', error);
+      handleFirestoreError(error, OperationType.UPDATE, `trips/${tripId}`);
     }
   };
 
@@ -590,9 +630,16 @@ export default function AdminDashboard() {
         <body>
           <div class="invoice-box">
             <div class="header">
-              <div class="company-info">
-                <h1>العوجان للسياحة والسفر</h1>
-                <p>خدمات شحن الطرود</p>
+              <div class="company-info" style="display: flex; align-items: center; gap: 15px;">
+                <img 
+                  src="/logoaujantravel.jpeg" 
+                  crossorigin="anonymous"
+                  style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+                />
+                <div>
+                  <h1>العوجان للسياحة والسفر</h1>
+                  <p>خدمات شحن الطرود</p>
+                </div>
               </div>
               <div class="tracking">
                 <p><strong>رقم بوليصة الشحن:</strong> ${parcel.waybillNumber}</p>
@@ -638,9 +685,24 @@ export default function AdminDashboard() {
             </div>
           </div>
           <script>
-            window.onload = () => {
-              window.print();
-              window.onafterprint = () => window.close();
+            window.onload = function() {
+              const images = document.getElementsByTagName('img');
+              let loaded = 0;
+              if (images.length === 0) {
+                window.print();
+                window.onafterprint = () => window.close();
+                return;
+              }
+              const check = () => {
+                loaded++;
+                if (loaded === images.length) {
+                  setTimeout(() => { window.print(); window.onafterprint = () => window.close(); }, 500);
+                }
+              };
+              for (let img of images) {
+                if (img.complete) check();
+                else { img.onload = check; img.onerror = check; }
+              }
             };
           </script>
         </body>
@@ -1604,10 +1666,10 @@ export default function AdminDashboard() {
                                     }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <img 
-                                          src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+                                          src="/logoaujantravel.jpeg" 
                                           alt="Logo" 
                                           referrerPolicy="no-referrer"
-                                          style={{ width: '40px', height: '40px', objectFit: 'contain' }} 
+                                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '50%' }} 
                                         />
                                         <div>
                                           <h2 style={{ margin: 0, color: '#065f46', fontSize: '20px', fontWeight: 'bold' }}>العوجان للسياحة</h2>

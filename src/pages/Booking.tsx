@@ -451,7 +451,12 @@ export default function BookingPage() {
         <div className="space-y-6">
           <button onClick={() => setStep('seats')} className="text-emerald-600 font-bold mb-4">← العودة لاختيار المقاعد</button>
           <div className="card space-y-6">
-            <h3 className="font-bold text-xl">بيانات الركاب</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-xl">بيانات الركاب</h3>
+              <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-xs font-bold border border-blue-100">
+                🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً
+              </div>
+            </div>
             {selectedSeats.map((seat, index) => (
               <div key={seat} className="p-4 border border-stone-100 rounded-2xl space-y-4">
                 <h4 className="font-bold text-emerald-600">المقعد رقم {seat}</h4>
@@ -506,17 +511,6 @@ export default function BookingPage() {
                 <label className="text-xs text-stone-500 font-bold">رقم التواصل</label>
                 <div className="flex flex-col gap-3">
                   <div className="flex gap-2 items-center bg-stone-50 border border-stone-200 rounded-2xl p-1 focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
-                    <input 
-                      type="tel" 
-                      placeholder={countryCode === '+963' ? '09xxxxxxxx' : '5xxxxxxxx'}
-                      value={contactPhone}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        setContactPhone(val.startsWith('0') ? val.substring(1) : val);
-                      }}
-                      className="flex-1 min-w-0 bg-transparent px-4 py-3 text-lg outline-none text-left font-mono tracking-wider"
-                      dir="ltr"
-                    />
                     <select 
                       value={countryCode} 
                       onChange={(e) => {
@@ -529,7 +523,7 @@ export default function BookingPage() {
                           setIsPhoneVerified(false);
                         }
                       }}
-                      className="bg-white border-r border-stone-100 rounded-xl px-2 py-3 text-[10px] sm:text-xs outline-none w-[105px] sm:w-[115px] shrink-0 font-bold ml-1"
+                      className="bg-white border-l border-stone-100 rounded-xl px-2 py-3 text-[10px] sm:text-xs outline-none w-[105px] sm:w-[115px] shrink-0 font-bold mr-1"
                     >
                       <option value="+966">السعودية 🇸🇦</option>
                       <option value="+971">الإمارات 🇦🇪</option>
@@ -543,6 +537,17 @@ export default function BookingPage() {
                       <option value="+964">العراق 🇮🇶</option>
                       <option value="+967">اليمن 🇾🇪</option>
                     </select>
+                    <input 
+                      type="tel" 
+                      placeholder={countryCode === '+963' ? '09xxxxxxxx' : '5xxxxxxxx'}
+                      value={contactPhone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setContactPhone(val.startsWith('0') ? val.substring(1) : val);
+                      }}
+                      className="flex-1 min-w-0 bg-transparent px-4 py-3 text-lg outline-none text-left font-mono tracking-wider"
+                      dir="ltr"
+                    />
                   </div>
                 </div>
               </div>
@@ -800,44 +805,57 @@ export default function BookingPage() {
                     backgroundColor: 'rgba(16, 185, 129, 0.1)' 
                   }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
                   <img 
-                    src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+                    src="/logoaujantravel.jpeg" 
                     alt="Logo" 
                     referrerPolicy="no-referrer"
-                    style={{ width: '48px', height: '48px', objectFit: 'contain' }} 
+                    crossOrigin="anonymous"
+                    style={{ 
+                      width: '50px', 
+                      height: '50px', 
+                      objectFit: 'cover', 
+                      borderRadius: '50%',
+                      border: '2px solid white',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      WebkitPrintColorAdjust: 'exact',
+                      printColorAdjust: 'exact'
+                    }} 
                   />
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '12px', color: '#a8a29e', margin: 0 }}>
+                    <p style={{ fontSize: '11px', color: '#a8a29e', margin: 0, lineHeight: 1 }}>
                       {selectedTrip?.tripType === 'umrah' ? 'تذكرة رحلة عمرة' : 'تذكرة سفر دولية'}
                     </p>
-                    <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>العوجان للسياحة</p>
+                    <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0, fontSize: '16px' }}>العوجان للسياحة</p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الاسم</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0 }}>{booking.passengerName}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الجواز</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0 }}>{booking.passportNumber || '---'}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الاسم</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0, fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.passengerName}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الجواز</p><p style={{ fontWeight: 'bold', color: '#1c1917', margin: 0, fontSize: '12px' }}>{booking.passportNumber || '---'}</p></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الحجز</p><p style={{ fontFamily: 'monospace', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.id.slice(0, 8)}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '12px', color: '#059669', margin: 0 }}>{selectedTrip?.trackingNumber}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم الحجز</p><p style={{ fontFamily: 'monospace', fontSize: '11px', color: '#1c1917', margin: 0 }}>{booking.id.slice(0, 8)}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '11px', color: '#059669', margin: 0 }}>{selectedTrip?.trackingNumber}</p></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الهاتف</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.passengerPhone}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '12px' }}>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الهاتف</p><p style={{ fontWeight: 'bold', fontSize: '11px', color: '#1c1917', margin: 0 }}>{booking.passengerPhone}</p></div>
                   </div>
-                  <div style={{ backgroundColor: '#ecfdf5', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>من</p><p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{booking.from || selectedTrip?.from}</p></div>
+                  <div style={{ backgroundColor: '#ecfdf5', padding: '12px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+                    <div><p style={{ fontSize: '9px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>من</p><p style={{ fontWeight: 'bold', fontSize: '16px', color: '#065f46', margin: 0 }}>{booking.from || selectedTrip?.from}</p></div>
                     <div style={{ color: '#6ee7b7' }}>←</div>
                     <div style={{ textAlign: 'left' }}>
-                      <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>إلى</p>
-                      <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{booking.to || selectedTrip?.to}</p>
+                      <p style={{ fontSize: '9px', textTransform: 'uppercase', color: '#059669', margin: 0 }}>إلى</p>
+                      <p style={{ fontWeight: 'bold', fontSize: '16px', color: '#065f46', margin: 0 }}>{booking.to || selectedTrip?.to}</p>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>التاريخ</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{formatDateArabic(selectedTrip?.date || '')}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الوقت</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{selectedTrip?.time}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>المقعد</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.seatNumber}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
+                    <div><p style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>التاريخ</p><p style={{ fontWeight: 'bold', fontSize: '10px', color: '#1c1917', margin: 0 }}>{formatDateArabic(selectedTrip?.date || '').split('،')[1] || formatDateArabic(selectedTrip?.date || '')}</p></div>
+                    <div><p style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الوقت</p><p style={{ fontWeight: 'bold', fontSize: '11px', color: '#1c1917', margin: 0 }}>{selectedTrip?.time}</p></div>
+                    <div><p style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>المقعد</p><p style={{ fontWeight: 'bold', fontSize: '11px', color: '#1c1917', margin: 0 }}>{booking.seatNumber}</p></div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <p style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', margin:0 }}>🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً</p>
                   </div>
                 </div>
                 <div style={{ borderTop: '2px dashed #e7e5e4', paddingTop: '16px', display: 'flex', justifyContent: 'center' }}>
@@ -855,10 +873,19 @@ export default function BookingPage() {
                 const element = document.getElementById(`ticket-preview-${i}`);
                 if (element) {
                   const canvas = await html2canvas(element, {
-                    scale: 2,
+                    scale: 3, // Higher scale for better quality
                     useCORS: true,
+                    allowTaint: false,
+                    logging: false,
                     backgroundColor: '#ffffff',
                     onclone: (clonedDoc) => {
+                      // Ensure images are visible in the clone
+                      const images = clonedDoc.getElementsByTagName('img');
+                      for (let img of images) {
+                        img.style.visibility = 'visible';
+                        img.style.opacity = '1';
+                      }
+                      
                       // Remove all existing stylesheets to prevent oklch parsing errors
                       const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
                       styles.forEach(s => s.remove());

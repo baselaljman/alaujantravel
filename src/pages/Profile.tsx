@@ -41,10 +41,16 @@ export default function Profile() {
         const element = document.getElementById(`ticket-to-download-${booking.id}`);
         if (element) {
           const canvas = await html2canvas(element, {
-            scale: 2,
+            scale: 3,
             useCORS: true,
+            allowTaint: false,
             backgroundColor: '#ffffff',
             onclone: (clonedDoc) => {
+              const images = clonedDoc.getElementsByTagName('img');
+              for (let img of images) {
+                img.style.visibility = 'visible';
+                img.style.opacity = '1';
+              }
               // Remove all existing stylesheets to prevent oklch parsing errors
               const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
               styles.forEach(s => s.remove());
@@ -288,16 +294,26 @@ export default function Profile() {
                               backgroundColor: 'rgba(16, 185, 129, 0.1)' 
                             }}
                           />
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
                             <img 
-                              src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+                              src="/logoaujantravel.jpeg" 
                               alt="Logo" 
                               referrerPolicy="no-referrer"
-                              style={{ width: '48px', height: '48px', objectFit: 'contain' }} 
+                              crossOrigin="anonymous"
+                              style={{ 
+                                width: '50px', 
+                                height: '50px', 
+                                objectFit: 'cover', 
+                                borderRadius: '50%',
+                                border: '2px solid white',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                WebkitPrintColorAdjust: 'exact',
+                                printColorAdjust: 'exact'
+                              }} 
                             />
                             <div style={{ textAlign: 'right' }}>
-                              <p style={{ fontSize: '12px', color: '#a8a29e', margin: 0 }}>تذكرة سفر دولية</p>
-                              <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0 }}>العوجان للسياحة</p>
+                              <p style={{ fontSize: '11px', color: '#a8a29e', margin: 0, lineHeight: 1 }}>تذكرة سفر دولية</p>
+                              <p style={{ fontWeight: 'bold', color: '#065f46', margin: 0, fontSize: '16px' }}>العوجان للسياحة</p>
                             </div>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -324,6 +340,9 @@ export default function Profile() {
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>التاريخ</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{formatDateArabic(trip.date)}</p></div>
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الوقت</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{trip.time}</p></div>
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>المقعد</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.seatNumber}</p></div>
+                            </div>
+                            <div style={{ backgroundColor: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                              <p style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', margin: 0 }}>🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً</p>
                             </div>
                           </div>
                           <div style={{ borderTop: '2px dashed #e7e5e4', paddingTop: '16px', display: 'flex', justifyContent: 'center' }}>

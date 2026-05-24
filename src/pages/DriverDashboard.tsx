@@ -134,7 +134,7 @@ export default function DriverDashboard() {
         await Promise.all(updatePromises);
       }
     } catch (error) {
-      console.error('Error updating trip status:', error);
+      handleFirestoreError(error, OperationType.UPDATE, `trips/${tripId}`);
       lastLocalStatusUpdateRef.current = 0; // Reset on error to allow snapshot to take over
     }
   };

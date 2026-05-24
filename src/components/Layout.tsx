@@ -138,10 +138,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       >
         <Link to="/" className="flex items-center gap-1 shrink-0">
           <img 
-            src="https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0226720471.firebasestorage.app/o/logoaujan.png?alt=media" 
+            src="/logoaujantravel.jpeg" 
             alt="Logo" 
             referrerPolicy="no-referrer"
-            className="w-7 h-7 sm:w-10 sm:h-10" 
+            className="w-7 h-7 sm:w-10 sm:h-10 rounded-full object-cover border border-emerald-100" 
           />
           <span className="text-base sm:text-xl font-bold text-emerald-800 hidden md:block">العوجان للسياحة</span>
         </Link>
