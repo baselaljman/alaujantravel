@@ -86,7 +86,7 @@ service cloud.firestore {
       return data.tripId is string && isValidId(data.tripId) &&
              data.passengerName is string && data.passengerName.size() <= 128 &&
              data.passengerPhone is string && data.passengerPhone.size() <= 20 &&
-             data.seatNumber is int && data.seatNumber >= 1 && data.seatNumber <= 100;
+             (data.seatNumber is int || data.seatNumber is float) && data.seatNumber >= 1 && data.seatNumber <= 100;
     }
 
     function isValidParcel(data) {
@@ -122,7 +122,7 @@ service cloud.firestore {
       allow create: if isAdmin() || hasPermission('manage_trips');
       allow update: if (
         // Case 1: Booking update (only seats)
-        (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['availableSeats', 'bookedSeats'])) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['availableSeats', 'bookedSeats'])) ||
         // Case 2: Driver updating status of their trip
         (hasRole('driver') && existing().driverId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
         // Case 3: Staff updating driverId
@@ -148,8 +148,9 @@ service cloud.firestore {
          get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.driverId == request.auth.uid)
       );
       
-      allow create: if isVerified() && isValidBooking(incoming()) && 
-                    exists(/databases/$(database)/documents/trips/$(incoming().tripId));
+      allow create: if isValidBooking(incoming()) && 
+                    exists(/databases/$(database)/documents/trips/$(incoming().tripId)) &&
+                    (incoming().userId == 'guest' || (isSignedIn() && incoming().userId == request.auth.uid));
       
       allow update: if (
         (isOwner(existing().userId)) || 

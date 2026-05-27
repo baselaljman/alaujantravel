@@ -636,41 +636,51 @@ export default function AdminDashboard() {
       });
 
       // 2. Send Push Notification via Backend API if requested
+      let pushErrorMsg = "";
       if (newNotification.deliveryMethod === 'push' || newNotification.deliveryMethod === 'both') {
-        if (finalTokens.length > 0) {
-          const response = await fetch('/api/send-notification', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tokens: finalTokens,
-              title: newNotification.title,
-              body: newNotification.body,
-              imageUrl: newNotification.imageUrl,
-              data: {
-                type: 'admin_broadcast',
-                sentAt: new Date().toISOString()
-              }
-            })
-          });
+        try {
+          if (finalTokens.length > 0) {
+            const response = await fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tokens: finalTokens,
+                title: newNotification.title,
+                body: newNotification.body,
+                imageUrl: newNotification.imageUrl,
+                data: {
+                  type: 'admin_broadcast',
+                  sentAt: new Date().toISOString()
+                }
+              })
+            });
 
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'Failed to send push notification');
+            if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.error || 'فشلت عملية الإرسال من الخادم (تأكد من تفعيل خدمة FCM)');
+            }
+            
+            const result = await response.json();
+            console.log('Push notification result:', result);
+          } else {
+            throw new Error('لم يتم رصد هواتف مرتبطة أو رموز FCM نشطة لهذه الفئة المستهدفة.');
           }
-          
-          const result = await response.json();
-          console.log('Push notification result:', result);
-        } else {
-          throw new Error('لم يتم العثور على أي أجهزة مسجلة أو رموز FCM نشطة لهذه الفئة المستهدفة.');
+        } catch (pushErr: any) {
+          console.warn("Direct push notification delivery error:", pushErr);
+          pushErrorMsg = pushErr.message;
         }
       }
       
       setNewNotification({ title: '', body: '', type: 'all', targetId: '', deliveryMethod: 'both', imageUrl: '' });
-      setError('تم إرسال الإشعار بنجاح');
-      setTimeout(() => setError(null), 3000);
+      if (pushErrorMsg) {
+        setError(`تم نشر الإشعار داخل التطبيق بنجاح. تنبيه للإرسال الفوري للهواتف: ${pushErrorMsg}`);
+      } else {
+        setError('تم إرسال الإشعار بنجاح لجميع القنوات المفعلة');
+      }
+      setTimeout(() => setError(null), 5000);
     } catch (error: any) {
-      console.error('Error sending notification:', error);
-      setError(`خطأ في إرسال الإشعار: ${error.message}`);
+      console.error('Error sending notification history:', error);
+      setError(`خطأ في إنشاء سجل الإشعارات: ${error.message}`);
     }
   };
 
@@ -698,31 +708,7 @@ export default function AdminDashboard() {
 
       const finalTokens = Array.from(new Set([...userTokens, ...deviceTokens]));
 
-      if (finalTokens.length === 0) {
-        throw new Error('لم يتم العثور على أي هاتف نشط مرتبط بهذا المسافر لتلقي الإشعارات.');
-      }
-
-      const response = await fetch('/api/send-notification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tokens: finalTokens,
-          title: directNotifTitle,
-          body: directNotifBody,
-          data: {
-            type: 'direct_customer_msg',
-            bookingId: directNotificationBooking.id,
-            sentAt: new Date().toISOString()
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Failed to send notification via API.');
-      }
-
-      // Save to notification history in Firestore
+      // 1. Save to notification history in Firestore FIRST (so it is saved anyway)
       await addDoc(collection(db, 'notifications'), {
         title: directNotifTitle,
         body: directNotifBody,
@@ -739,16 +725,60 @@ export default function AdminDashboard() {
         }
       });
 
+      // 2. Send via Backend API
+      if (finalTokens.length === 0) {
+        setDirectNotificationBooking(null);
+        setDirectNotifTitle('');
+        setDirectNotifBody('');
+        setDirectNotifStatus('success');
+        setError('تم تسجيل الإشعار كإشعار داخلي للمسافر، لكن لم يتم رصد هاتف ذكي مباشر نشط لهاتفه لتلقي التنبيه الفوري.');
+        setTimeout(() => setError(null), 6000);
+        return;
+      }
+
+      let apiSuccess = true;
+      let apiErrorMsg = "";
+      try {
+        const response = await fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokens: finalTokens,
+            title: directNotifTitle,
+            body: directNotifBody,
+            data: {
+              type: 'direct_customer_msg',
+              bookingId: directNotificationBooking.id,
+              sentAt: new Date().toISOString()
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'FCM error response.');
+        }
+      } catch (fcmErr: any) {
+        console.warn('FCM delivery failed for direct msg:', fcmErr);
+        apiSuccess = false;
+        apiErrorMsg = fcmErr.message;
+      }
+
       setDirectNotificationBooking(null);
       setDirectNotifTitle('');
       setDirectNotifBody('');
       setDirectNotifStatus('success');
-      setError('تم إرسال الإشعار المخصص للمسافر بنجاح');
-      setTimeout(() => setError(null), 3500);
+
+      if (!apiSuccess) {
+        setError(`تم حفظ الإشعار في أرشيف المسافر. تنبيه للتنبيه الفوري: ${apiErrorMsg || 'خطأ في الاتصال بخادم FCM'}`);
+      } else {
+        setError('تم إرسال الإشعار المخصص للمسافر بنجاح');
+      }
+      setTimeout(() => setError(null), 5000);
     } catch (err: any) {
       console.error('Error in send direct notification:', err);
       setDirectNotifStatus('error');
-      alert('حدث خطأ أثناء إرسال الإشعار: ' + err.message);
+      alert('حدث خطأ غير متوقع أثناء إرسال الإشعار: ' + err.message);
     }
   };
 
@@ -1169,22 +1199,32 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                 <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
-                  <p className="text-xs text-stone-500 mb-1">إجمالي المستخدمين</p>
+                  <p className="text-xs text-stone-500 mb-1">إجمالي الحسابات</p>
                   <p className="text-xl font-bold">{users.length}</p>
                 </div>
                 <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                  <p className="text-xs text-emerald-600 mb-1">مسجلين للإشعارات</p>
-                  <p className="text-xl font-bold text-emerald-700">{users.filter(u => !!u.fcmToken).length}</p>
+                  <p className="text-xs text-emerald-600 mb-1">الهواتف الفعالة (FCM)</p>
+                  <p className="text-xl font-bold text-emerald-700">
+                    {Array.from(new Set([...users.map(u => u.fcmToken), ...devices.map(d => d.token)])).filter(Boolean).length}
+                  </p>
                 </div>
                 <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                  <p className="text-xs text-blue-600 mb-1">أندرويد</p>
-                  <p className="text-xl font-bold text-blue-700">{users.filter(u => u.deviceType === 'android' && !!u.fcmToken).length}</p>
+                  <p className="text-xs text-blue-600 mb-1">أجهزة أندرويد النشطة</p>
+                  <p className="text-xl font-bold text-blue-700">
+                    {Array.from(new Set([...users.filter(u => u.deviceType === 'android').map(u => u.fcmToken), ...devices.filter(d => d.platform === 'android').map(d => d.token)])).filter(Boolean).length}
+                  </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100">
-                  <p className="text-xs text-purple-600 mb-1">آيفون</p>
-                  <p className="text-xl font-bold text-purple-700">{users.filter(u => u.deviceType === 'ios' && !!u.fcmToken).length}</p>
+                  <p className="text-xs text-purple-600 mb-1">أجهزة آيفون النشطة</p>
+                  <p className="text-xl font-bold text-purple-700">
+                    {Array.from(new Set([...users.filter(u => u.deviceType === 'ios').map(u => u.fcmToken), ...devices.filter(d => d.platform === 'ios').map(d => d.token)])).filter(Boolean).length}
+                  </p>
+                </div>
+                <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                  <p className="text-xs text-amber-600 mb-1">إجمالي الأجهزة المسجلة</p>
+                  <p className="text-xl font-bold text-amber-700">{devices.length}</p>
                 </div>
               </div>
               
