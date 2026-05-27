@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query, where, addDoc, doc, updateDoc, getDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../firebase';
 import { Trip, Booking, City } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, registerDeviceToken } from '../hooks/useAuth';
 import { useCurrency } from '../hooks/useCurrency';
 import { Calendar, Users, CheckCircle, Download, Globe, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -190,6 +190,20 @@ export default function BookingPage() {
         availableSeats: Math.max(0, (selectedTrip.availableSeats || 0) - selectedSeats.length),
         bookedSeats: arrayUnion(...selectedSeats)
       });
+
+      // Automatically register/link the active Android FCM token with the booking phone number
+      try {
+        const activeToken = localStorage.getItem('android_token') || (window as any).androidToken || (window as any).fcmToken;
+        if (activeToken) {
+          const mainPhone = `${countryCode}${contactPhone.replace(/^0+/, '')}`;
+          const mainName = passengers[0]?.name || 'مسافر';
+          const model = localStorage.getItem('android_model') || (window as any).androidModel;
+          console.log('Linking Android Device to recent booking phone:', { activeToken, mainPhone, mainName });
+          await registerDeviceToken(activeToken, model || undefined, user?.uid || undefined, mainPhone, mainName);
+        }
+      } catch (tokenErr) {
+        console.error('Error auto-registering device token during checkout:', tokenErr);
+      }
 
       setBookingSuccess(bookings);
       setStep('success');

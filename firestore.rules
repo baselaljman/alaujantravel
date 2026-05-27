@@ -221,6 +221,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // --- Devices (Push Notifications) ---
+    match /devices/{deviceId} {
+      allow read, create, update: if true;
+      allow delete: if isAdmin();
+    }
+
     // --- SMS OTPs ---
     match /sms_otps/{id} {
       allow read, write: if false;

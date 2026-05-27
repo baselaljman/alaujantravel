@@ -120,12 +120,27 @@ export interface Banner {
   active: boolean;
 }
 
+export interface Device {
+  id: string;
+  appName?: string;
+  lastSeen?: any;
+  model: string;
+  osVersion?: string;
+  platform: string;
+  token: string;
+  userId?: string;
+  userEmail?: string;
+  userPhone?: string;
+  displayName?: string;
+  linkedAt?: any;
+}
+
 export interface Notification {
   id: string;
   title: string;
   body: string;
-  type: 'all' | 'drivers' | 'users' | 'specific';
-  targetId?: string;
+  type: 'all' | 'drivers' | 'users' | 'specific' | 'trip';
+  targetId?: string; // Can be userId or tripId
   sentAt: string;
   sentBy: string;
   deliveryMethod?: 'push' | 'in-app' | 'both';

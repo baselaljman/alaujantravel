@@ -1,6 +1,7 @@
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { db, auth, updateDoc, doc } from '../firebase';
+import { registerDeviceToken } from '../hooks/useAuth';
 
 export const initializePushNotifications = async () => {
   if (Capacitor.getPlatform() === 'web') {
@@ -51,6 +52,13 @@ export const initializePushNotifications = async () => {
       console.log('Push registration success! Token:', token.value);
       // Store token in window for easy debugging in console
       (window as any).fcmToken = token.value;
+      localStorage.setItem('android_token', token.value);
+      
+      // Call registerDeviceToken directly to register the Android device in Firestore devices collection
+      registerDeviceToken(token.value, undefined, auth.currentUser?.uid).catch(err => {
+        console.error('Error registering device token in firebase collection:', err);
+      });
+
       saveTokenToFirestore(token.value);
     });
 

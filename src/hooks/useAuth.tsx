@@ -55,6 +55,173 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const normalizePhone = (p?: string): string => {
+  if (!p) return '';
+  let digits = p.replace(/\D/g, ''); // Strip all non-digit characters
+  if (digits.startsWith('00')) {
+    digits = digits.slice(2);
+  }
+  if (digits.startsWith('964')) {
+    digits = digits.slice(3);
+  } else if (digits.startsWith('966')) {
+    digits = digits.slice(3);
+  } else if (digits.startsWith('963')) {
+    digits = digits.slice(3);
+  }
+  
+  // Strip any leading zeros
+  digits = digits.replace(/^0+/, '');
+  return digits;
+};
+
+export async function registerDeviceToken(token: string, modelName?: string, userId?: string, explicitPhone?: string, explicitName?: string) {
+  if (!token) return;
+  try {
+    const ua = navigator.userAgent;
+    let model = modelName || 'Android Device';
+    if (!modelName) {
+      const modelMatch = ua.match(/Android\s+[0-9._]+;\s+([^;)]+)/i);
+      if (modelMatch) {
+        let rawModel = modelMatch[1].trim();
+        rawModel = rawModel.split(/\s+Build\//i)[0].trim();
+        model = rawModel;
+      }
+    }
+
+    console.log('Firebase WebView Bridge - Registering Token:', { token, model, userId, explicitPhone, explicitName });
+
+    const deviceRef = doc(db, 'devices', token);
+
+    const uid = userId || auth.currentUser?.uid || '';
+    let userEmail = '';
+    let userPhone = explicitPhone || '';
+    let displayName = explicitName || '';
+
+    if (uid && (!userPhone || !displayName)) {
+      const userDocRef = doc(db, 'users', uid);
+      const userDoc = await getDoc(userDocRef).catch(() => null);
+      if (userDoc && userDoc.exists()) {
+        const uData = userDoc.data();
+        if (!displayName) displayName = uData.displayName || '';
+        userEmail = uData.email || '';
+        if (!userPhone) userPhone = uData.phoneNumber || uData.userPhone || '';
+      } else if (auth.currentUser) {
+        if (!displayName) displayName = auth.currentUser.displayName || '';
+        userEmail = auth.currentUser.email || '';
+        if (!userPhone) userPhone = auth.currentUser.phoneNumber || '';
+      }
+    }
+
+    const deviceData: any = {
+      token: token,
+      platform: 'android',
+      model: model,
+      lastSeen: Timestamp.now(),
+      appName: 'com.aloujan.bus',
+      ...(uid ? { userId } : {}),
+      ...(userEmail ? { userEmail } : {}),
+      ...(userPhone ? { userPhone } : {}),
+      ...(displayName ? { displayName } : {})
+    };
+
+    if (uid || userPhone || displayName) {
+      deviceData.linkedAt = Timestamp.now();
+    }
+
+    await setDoc(deviceRef, deviceData, { merge: true });
+    localStorage.setItem('android_token', token);
+    if (model) localStorage.setItem('android_model', model);
+    console.log('Successfully saved device to Firestore devs collection.');
+
+    if (uid) {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, {
+        fcmToken: token,
+        deviceType: 'android'
+      }).catch(err => console.log('Could not update profile FCM token: ', err));
+    }
+  } catch (error) {
+    console.error('Error in registerDeviceToken:', error);
+  }
+}
+
+async function associateDeviceWithUser(currentUser: User) {
+  try {
+    const ua = navigator.userAgent;
+    if (!/Android/i.test(ua)) {
+      console.log('Not an Android device user agent, skip pairing.');
+      return;
+    }
+
+    // Parse OS Version and Model from User Agent
+    const androidMatch = ua.match(/Android\s+([0-9._]+)/i);
+    const osVersion = androidMatch ? androidMatch[1] : null;
+
+    let model = null;
+    const modelMatch = ua.match(/Android\s+[0-9._]+;\s+([^;)]+)/i);
+    if (modelMatch) {
+      let rawModel = modelMatch[1].trim();
+      rawModel = rawModel.split(/\s+Build\//i)[0].trim();
+      model = rawModel;
+    }
+
+    if (!model) {
+      console.log('Could not reliably parse Android model from User Agent.');
+      return;
+    }
+
+    console.log('WebView Pairing - Detected Device Info:', { osVersion, model });
+
+    // Fetch android devices matching this model
+    const q = query(
+      collection(db, 'devices'),
+      where('platform', '==', 'android'),
+      where('model', '==', model)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      console.log('No matching device found in Firestore for model:', model);
+      return;
+    }
+
+    // Find the one that was seen most recently
+    const docs = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ref: doc.ref,
+      data: doc.data()
+    }));
+
+    docs.sort((a, b) => {
+      const timeA = a.data.lastSeen?.toDate ? a.data.lastSeen.toDate().getTime() : 0;
+      const timeB = b.data.lastSeen?.toDate ? b.data.lastSeen.toDate().getTime() : 0;
+      return timeB - timeA;
+    });
+
+    const bestMatch = docs[0];
+    
+    // Check if the best match is reasonably recent (e.g. within last 24 hours) to avoid linking wrong device
+    const lastSeenTime = bestMatch.data.lastSeen?.toDate ? bestMatch.data.lastSeen.toDate().getTime() : 0;
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+    
+    if (lastSeenTime > twentyFourHoursAgo) {
+      console.log('Linking user with device:', bestMatch.id);
+      await updateDoc(bestMatch.ref, {
+        userId: currentUser.uid,
+        userEmail: currentUser.email || '',
+        userPhone: currentUser.phoneNumber || '',
+        displayName: currentUser.displayName || '',
+        linkedAt: Timestamp.now()
+      });
+      console.log('Device linked successfully to user:', currentUser.uid);
+    } else {
+      console.log('Best matching device is too old or inactive. Skip pairing.');
+    }
+  } catch (error) {
+    console.error('Error in associateDeviceWithUser:', error);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -68,6 +235,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set persistence language to Arabic for SMS and reCAPTCHA
     auth.languageCode = 'ar';
 
+    // Expose registration bridge for the Android WebView app
+    (window as any).registerAndroidToken = (token: string, modelName?: string) => {
+      console.log('WebView Native App called registerAndroidToken with:', token, modelName);
+      (window as any).androidToken = token;
+      if (modelName) (window as any).androidModel = modelName;
+      
+      localStorage.setItem('android_token', token);
+      if (modelName) localStorage.setItem('android_model', modelName);
+
+      registerDeviceToken(token, modelName, auth.currentUser?.uid);
+    };
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       
@@ -77,6 +256,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (user) {
+        const storedToken = localStorage.getItem('android_token') || (window as any).androidToken;
+        const storedModel = localStorage.getItem('android_model') || (window as any).androidModel;
+        if (storedToken) {
+          registerDeviceToken(storedToken, storedModel || undefined, user.uid);
+        } else {
+          associateDeviceWithUser(user);
+        }
         const docRef = doc(db, 'users', user.uid);
         
         // Listen to profile changes in real-time

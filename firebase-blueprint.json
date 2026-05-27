@@ -156,9 +156,32 @@
         "expiresAt": { "type": "string", "format": "date-time", "description": "Expiration timestamp" }
       },
       "required": ["code", "expiresAt"]
+    },
+    "Device": {
+      "title": "Device",
+      "description": "Information about an Android device running the WebView app",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string", "description": "The name of the app package" },
+        "lastSeen": { "type": "string", "format": "date-time", "description": "Last time device opened the app" },
+        "model": { "type": "string", "description": "Device hardware model" },
+        "osVersion": { "type": "string", "description": "Device Android version" },
+        "platform": { "type": "string", "description": "Device platform (android)" },
+        "token": { "type": "string", "description": "FCM device registration token" },
+        "userId": { "type": "string", "description": "Linked user uid" },
+        "userEmail": { "type": "string", "description": "Linked user email" },
+        "userPhone": { "type": "string", "description": "Linked user phone" },
+        "displayName": { "type": "string", "description": "Linked user full name" },
+        "linkedAt": { "type": "string", "format": "date-time", "description": "Timestamp when device was linked to user" }
+      },
+      "required": ["token", "model", "platform"]
     }
   },
   "firestore": {
+    "/devices": {
+      "schema": "Device",
+      "description": "Collection of registered mobile devices for sending push notifications"
+    },
     "/trips": {
       "schema": "Trip",
       "description": "Collection of all available bus trips"

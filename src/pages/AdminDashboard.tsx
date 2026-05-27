@@ -4,14 +4,14 @@ import {
   query, where, runTransaction, getDocs 
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel, Notification, TripStop } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel, Notification, TripStop, Device } from '../types';
+import { useAuth, normalizePhone } from '../hooks/useAuth';
 import { useCurrency } from '../hooks/useCurrency';
 import { 
   Plus, Trash2, Edit, Bus as BusIcon, Users, Package, 
   Calendar, Shield, UserCheck, Settings, LayoutDashboard,
   CreditCard, MapPin, Clock, AlertCircle, X, Printer, Download, Search,
-  Image as ImageIcon, DollarSign, Bell, Send
+  Image as ImageIcon, DollarSign, Bell, Send, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AdminCities from './AdminCities';
@@ -65,6 +65,29 @@ export default function AdminDashboard() {
     title: '', body: '', type: 'all', targetId: '', deliveryMethod: 'both', imageUrl: ''
   });
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
+
+  // Helper to find device linked to a booking
+  const getLinkedDeviceForBooking = (booking: Booking) => {
+    return devices.find(d => {
+      // 1. Check exact user ID
+      if (booking.userId && d.userId === booking.userId) {
+        return true;
+      }
+      // 2. Check normalized phone numbers
+      const normBookingPhone = normalizePhone(booking.passengerPhone);
+      const normDevicePhone = normalizePhone(d.userPhone);
+      if (normBookingPhone && normDevicePhone && normBookingPhone === normDevicePhone) {
+        return true;
+      }
+      return false;
+    });
+  };
+
+  const [directNotificationBooking, setDirectNotificationBooking] = useState<Booking | null>(null);
+  const [directNotifTitle, setDirectNotifTitle] = useState('');
+  const [directNotifBody, setDirectNotifBody] = useState('');
+  const [directNotifStatus, setDirectNotifStatus] = useState<string | null>(null);
 
   // Booking Management States
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
@@ -389,6 +412,12 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.LIST, 'notifications');
     });
 
+    const unsubDevices = onSnapshot(collection(db, 'devices'), (snap) => {
+      setDevices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Device)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'devices');
+    });
+
     setLoading(false);
     return () => {
       unsubTrips();
@@ -399,6 +428,7 @@ export default function AdminDashboard() {
       unsubBanners();
       unsubParcels();
       unsubNotifications();
+      unsubDevices();
     };
   }, [profile]);
 
@@ -537,21 +567,64 @@ export default function AdminDashboard() {
     if (!newNotification.title || !newNotification.body) return;
     
     try {
-      // Calculate stats based on target audience
-      let targetUsers = users;
-      if (newNotification.type === 'drivers') {
-        targetUsers = users.filter(u => u.role === 'driver');
+      let finalTokens: string[] = [];
+      let targetUserCount = 0;
+
+      // Type-specific logic to extract tokens from users and devices collections
+      if (newNotification.type === 'all') {
+        const userTokens = users.map(u => u.fcmToken).filter(Boolean) as string[];
+        const deviceTokens = devices.map(d => d.token).filter(Boolean) as string[];
+        finalTokens = Array.from(new Set([...userTokens, ...deviceTokens]));
+        targetUserCount = users.length;
+      } else if (newNotification.type === 'drivers') {
+        const driverIds = users.filter(u => u.role === 'driver').map(u => u.uid);
+        const userTokens = users.filter(u => u.role === 'driver').map(u => u.fcmToken).filter(Boolean) as string[];
+        const deviceTokens = devices.filter(d => d.userId && driverIds.includes(d.userId)).map(d => d.token).filter(Boolean) as string[];
+        finalTokens = Array.from(new Set([...userTokens, ...deviceTokens]));
+        targetUserCount = driverIds.length;
       } else if (newNotification.type === 'users') {
-        targetUsers = users.filter(u => u.role === 'user');
+        const passengerIds = users.filter(u => u.role === 'user').map(u => u.uid);
+        const userTokens = users.filter(u => u.role === 'user').map(u => u.fcmToken).filter(Boolean) as string[];
+        const deviceTokens = devices.filter(d => !d.userId || (d.userId && passengerIds.includes(d.userId))).map(d => d.token).filter(Boolean) as string[];
+        finalTokens = Array.from(new Set([...userTokens, ...deviceTokens]));
+        targetUserCount = passengerIds.length;
       } else if (newNotification.type === 'specific') {
-        targetUsers = users.filter(u => u.uid === newNotification.targetId);
+        const specificUserId = newNotification.targetId;
+        const targetUser = users.find(u => u.uid === specificUserId);
+        const userTokens = targetUser?.fcmToken ? [targetUser.fcmToken] : [];
+        const normTargetPhone = normalizePhone(targetUser?.phoneNumber);
+        const deviceTokens = devices.filter(d => {
+          if (specificUserId && d.userId === specificUserId) return true;
+          const normDevicePhone = normalizePhone(d.userPhone);
+          if (normTargetPhone && normDevicePhone && normTargetPhone === normDevicePhone) return true;
+          return false;
+        }).map(d => d.token).filter(Boolean) as string[];
+        finalTokens = Array.from(new Set([...userTokens, ...deviceTokens]));
+        targetUserCount = finalTokens.length > 0 ? 1 : 0;
+      } else if (newNotification.type === 'trip') {
+        const targetTripId = newNotification.targetId;
+        const tripBookings = bookings.filter(b => b.tripId === targetTripId && b.status !== 'cancelled');
+        const bookedUserIds = tripBookings.map(b => b.userId).filter(Boolean);
+        const bookedPhonesNormalized = tripBookings.map(b => normalizePhone(b.passengerPhone)).filter(Boolean);
+        
+        const bookedUserTokens = users.filter(u => bookedUserIds.includes(u.uid)).map(u => u.fcmToken).filter(Boolean) as string[];
+        const bookedDeviceTokens = devices.filter(d => {
+          if (d.userId && bookedUserIds.includes(d.userId)) return true;
+          const normDevicePhone = normalizePhone(d.userPhone);
+          if (normDevicePhone && bookedPhonesNormalized.includes(normDevicePhone)) return true;
+          return false;
+        }).map(d => d.token).filter(Boolean) as string[];
+        finalTokens = Array.from(new Set([...bookedUserTokens, ...bookedDeviceTokens]));
+        targetUserCount = tripBookings.length;
       }
 
+      const totalAndroidDevices = devices.filter(d => finalTokens.includes(d.token) && d.platform === 'android').length;
+
       const stats = {
-        total: targetUsers.length,
-        android: targetUsers.filter(u => u.deviceType === 'android').length,
-        ios: targetUsers.filter(u => u.deviceType === 'ios').length,
-        web: targetUsers.filter(u => u.deviceType === 'web' || !u.deviceType).length
+        total: finalTokens.length,
+        android: totalAndroidDevices,
+        ios: finalTokens.length - totalAndroidDevices,
+        web: 0
       };
 
       // 1. Save to Firestore (for in-app history)
@@ -564,16 +637,12 @@ export default function AdminDashboard() {
 
       // 2. Send Push Notification via Backend API if requested
       if (newNotification.deliveryMethod === 'push' || newNotification.deliveryMethod === 'both') {
-        const tokens = targetUsers
-          .map(u => u.fcmToken)
-          .filter(token => !!token) as string[];
-
-        if (tokens.length > 0) {
+        if (finalTokens.length > 0) {
           const response = await fetch('/api/send-notification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              tokens,
+              tokens: finalTokens,
               title: newNotification.title,
               body: newNotification.body,
               imageUrl: newNotification.imageUrl,
@@ -591,6 +660,8 @@ export default function AdminDashboard() {
           
           const result = await response.json();
           console.log('Push notification result:', result);
+        } else {
+          throw new Error('لم يتم العثور على أي أجهزة مسجلة أو رموز FCM نشطة لهذه الفئة المستهدفة.');
         }
       }
       
@@ -600,6 +671,84 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error('Error sending notification:', error);
       setError(`خطأ في إرسال الإشعار: ${error.message}`);
+    }
+  };
+
+  const handleSendDirectNotification = async () => {
+    if (!directNotificationBooking || !directNotifTitle || !directNotifBody) return;
+
+    try {
+      setDirectNotifStatus('sending');
+      
+      const targetUserId = directNotificationBooking.userId;
+      const passengerPhone = directNotificationBooking.passengerPhone;
+      
+      // Collect user token
+      const userProfile = users.find(u => u.uid === targetUserId);
+      const userTokens = userProfile?.fcmToken ? [userProfile.fcmToken] : [];
+
+      // Collect device tokens matching userId or passengerPhone
+      const normPassengerPhone = normalizePhone(passengerPhone);
+      const deviceTokens = devices.filter(d => {
+        if (targetUserId && d.userId === targetUserId) return true;
+        const normDevicePhone = normalizePhone(d.userPhone);
+        if (normPassengerPhone && normDevicePhone && normPassengerPhone === normDevicePhone) return true;
+        return false;
+      }).map(d => d.token).filter(Boolean) as string[];
+
+      const finalTokens = Array.from(new Set([...userTokens, ...deviceTokens]));
+
+      if (finalTokens.length === 0) {
+        throw new Error('لم يتم العثور على أي هاتف نشط مرتبط بهذا المسافر لتلقي الإشعارات.');
+      }
+
+      const response = await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokens: finalTokens,
+          title: directNotifTitle,
+          body: directNotifBody,
+          data: {
+            type: 'direct_customer_msg',
+            bookingId: directNotificationBooking.id,
+            sentAt: new Date().toISOString()
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to send notification via API.');
+      }
+
+      // Save to notification history in Firestore
+      await addDoc(collection(db, 'notifications'), {
+        title: directNotifTitle,
+        body: directNotifBody,
+        type: 'specific',
+        targetId: targetUserId || 'anonymous',
+        sentAt: new Date().toISOString(),
+        sentBy: profile?.uid,
+        deliveryMethod: 'push',
+        stats: {
+          total: finalTokens.length,
+          android: devices.filter(d => finalTokens.includes(d.token) && d.platform === 'android').length,
+          ios: 0,
+          web: 0
+        }
+      });
+
+      setDirectNotificationBooking(null);
+      setDirectNotifTitle('');
+      setDirectNotifBody('');
+      setDirectNotifStatus('success');
+      setError('تم إرسال الإشعار المخصص للمسافر بنجاح');
+      setTimeout(() => setError(null), 3500);
+    } catch (err: any) {
+      console.error('Error in send direct notification:', err);
+      setDirectNotifStatus('error');
+      alert('حدث خطأ أثناء إرسال الإشعار: ' + err.message);
     }
   };
 
@@ -916,6 +1065,86 @@ export default function AdminDashboard() {
               </motion.div>
             </div>
           )}
+
+          {/* Direct Notification Modal */}
+          {directNotificationBooking && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl text-right space-y-4"
+              >
+                <div className="flex justify-between items-center pb-3 border-b border-stone-100">
+                  <h3 className="text-lg font-bold text-emerald-600">إرسال إشعار مخصص للهاتف</h3>
+                  <button 
+                    onClick={() => setDirectNotificationBooking(null)}
+                    className="p-1 hover:bg-stone-100 rounded-full text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="bg-stone-50 p-3 rounded-2xl border border-stone-100 text-xs text-stone-600 space-y-1">
+                  <p><strong>المسافر:</strong> {directNotificationBooking.passengerName}</p>
+                  <p><strong>الهاتف:</strong> {directNotificationBooking.passengerPhone}</p>
+                  {(() => {
+                    const dev = getLinkedDeviceForBooking(directNotificationBooking);
+                    return dev ? (
+                      <p className="text-emerald-600 flex items-center gap-1 font-bold mt-1">
+                        <Smartphone size={12} />
+                        <span>الهاتف المرتبط نشط ({dev.model}) - جاهز لاستقبال الإشعار الفوري</span>
+                      </p>
+                    ) : (
+                      <p className="text-amber-500 font-bold flex items-center gap-1 mt-1">
+                        <AlertCircle size={12} />
+                        <span>لم يتم رصد هاتف ذكي مباشر نشط لهذا الحساب حتى الآن. سيتم توجيهه بالرمز المحفوظ أو تعذر الاستلام.</span>
+                      </p>
+                    );
+                  })()}
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">عنوان الإشعار</label>
+                    <input 
+                      type="text" 
+                      placeholder="عنوان الإشعار (مثال: تحديث عاجل للرحلة)" 
+                      value={directNotifTitle} 
+                      onChange={e => setDirectNotifTitle(e.target.value)} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">نص الرسالة</label>
+                    <textarea 
+                      placeholder="اكتب هنا تفاصيل الإشعار المخصص..." 
+                      value={directNotifBody} 
+                      onChange={e => setDirectNotifBody(e.target.value)} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px] text-right"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={handleSendDirectNotification} 
+                    disabled={directNotifStatus === 'sending'}
+                    className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 disabled:bg-stone-200 disabled:text-stone-400 transition-colors flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Send size={16} />
+                    {directNotifStatus === 'sending' ? 'جاري الإرسال...' : 'إرسال الإشعار الفوري'}
+                  </button>
+                  <button 
+                    onClick={() => setDirectNotificationBooking(null)} 
+                    className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors text-sm"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
           {activeTab === 'notifications' && canSeeTab('notifications') && (
             <motion.div key="notifications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
               <div className="flex justify-between items-center">
@@ -972,13 +1201,14 @@ export default function AdminDashboard() {
                     />
                     <select 
                       value={newNotification.type} 
-                      onChange={e => setNewNotification({...newNotification, type: e.target.value as any})} 
+                      onChange={e => setNewNotification({...newNotification, type: e.target.value as any, targetId: ''})} 
                       className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value="all">الكل</option>
                       <option value="drivers">السائقين فقط</option>
                       <option value="users">المسافرين فقط</option>
                       <option value="specific">مستخدم محدد</option>
+                      <option value="trip">ركاب رحلة معينة</option>
                     </select>
                     <select 
                       value={newNotification.deliveryMethod} 
@@ -1006,7 +1236,24 @@ export default function AdminDashboard() {
                         className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="">اختر المستخدم</option>
-                        {users.map(u => <option key={u.uid} value={u.uid}>{u.displayName} ({u.email})</option>)}
+                        {users.map(u => <option key={u.uid} value={u.uid}>{u.displayName} ({u.phoneNumber || u.email || ''})</option>)}
+                      </select>
+                    )}
+                    {newNotification.type === 'trip' && (
+                      <select 
+                        value={newNotification.targetId} 
+                        onChange={e => setNewNotification({...newNotification, targetId: e.target.value})} 
+                        className="bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">اختر الرحلة</option>
+                        {trips.map(t => {
+                          const driverName = users.find(u => u.uid === t.driverId)?.displayName || 'بدون سائق';
+                          return (
+                            <option key={t.id} value={t.id}>
+                              {t.from} ← {t.to} | {t.departureDate ? formatDateArabic(t.departureDate) : t.date} الساعة {t.departureTime || t.time} ({driverName})
+                            </option>
+                          );
+                        })}
                       </select>
                     )}
                   </div>
@@ -1051,6 +1298,10 @@ export default function AdminDashboard() {
                             notif.type === 'all' ? 'الكل' : 
                             notif.type === 'drivers' ? 'السائقين' : 
                             notif.type === 'users' ? 'المسافرين' : 
+                            notif.type === 'trip' ? (() => {
+                              const t = trips.find(trip => trip.id === notif.targetId);
+                              return t ? `ركاب رحلة (${t.from} ← ${t.to} بتاريخ ${t.date})` : 'رحلة محذوفة';
+                            })() :
                             `مستخدم محدد (${users.find(u => u.uid === notif.targetId)?.displayName || 'غير معروف'})`
                           }
                         </span>
@@ -1538,6 +1789,24 @@ export default function AdminDashboard() {
                                       {booking.from} ← {booking.to}
                                     </p>
                                   )}
+                                  {(() => {
+                                    const linkedDevice = getLinkedDeviceForBooking(booking);
+                                    if (linkedDevice) {
+                                      return (
+                                        <div className="flex items-center gap-1 mt-1 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded w-max border border-emerald-100">
+                                          <Smartphone size={10} />
+                                          <span>جهاز نشط: {linkedDevice.model}</span>
+                                        </div>
+                                      );
+                                    } else {
+                                      return (
+                                        <div className="flex items-center gap-1 mt-1 text-[10px] text-stone-400 bg-stone-50 px-1.5 py-0.5 rounded w-max border border-stone-100">
+                                          <Smartphone size={10} className="opacity-50" />
+                                          <span>لا يوجد هاتف مرتبط</span>
+                                        </div>
+                                      );
+                                    }
+                                  })()}
                                 </>
                               )}
                             </td>
@@ -1608,6 +1877,17 @@ export default function AdminDashboard() {
                                       title="طباعة التذكرة"
                                     >
                                       <Printer size={16} />
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setDirectNotificationBooking(booking);
+                                        setDirectNotifTitle('تحديث بخصوص رحلتك');
+                                        setDirectNotifBody(`عزيزي ${booking.passengerName}، نود إعلامك بـ...`);
+                                      }}
+                                      className="text-amber-500 p-2 hover:bg-amber-50 rounded-lg"
+                                      title="إرسال إشعار مباشر للهاتف"
+                                    >
+                                      <Bell size={16} />
                                     </button>
                                     <button 
                                       onClick={() => startEditingBooking(booking)}
