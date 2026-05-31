@@ -229,6 +229,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // --- Settings ---
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // --- Devices (Push Notifications) ---
     match /devices/{deviceId} {
       allow read, create, update: if true;

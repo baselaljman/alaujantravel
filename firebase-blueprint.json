@@ -175,9 +175,21 @@
         "linkedAt": { "type": "string", "format": "date-time", "description": "Timestamp when device was linked to user" }
       },
       "required": ["token", "model", "platform"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application configuration settings",
+      "type": "object",
+      "properties": {
+        "notificationGatewayUrl": { "type": "string", "description": "Custom API server gateway url for push notifications" }
+      }
     }
   },
   "firestore": {
+    "/settings": {
+      "schema": "Settings",
+      "description": "Collection containing global application settings"
+    },
     "/devices": {
       "schema": "Device",
       "description": "Collection of registered mobile devices for sending push notifications"
