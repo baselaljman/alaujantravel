@@ -232,7 +232,11 @@ service cloud.firestore {
     // --- Settings ---
     match /settings/{id} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isSignedIn() && (
+        isAdmin() || 
+        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"]) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
     }
 
     // --- Devices (Push Notifications) ---

@@ -69,6 +69,44 @@ export default function AdminDashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
 
+  // Helper to construct fully qualified API URL considering local preview vs static gateways
+  const getApiUrl = (path: string) => {
+    // If we are running in the development / preview container (like .run.app or localhost)
+    const isLocalContainer = window.location.hostname.includes('.run.app') || 
+                             window.location.hostname.includes('localhost') || 
+                             window.location.hostname.includes('127.0.0.1');
+
+    if (isLocalContainer) {
+      return path; // Always use the local full-stack server
+    }
+
+    // Otherwise we are on the external production domain (like alaujantravel.com)
+    if (!gatewayUrl) {
+      return path;
+    }
+
+    // Clean up gatewayUrl
+    const cleanGateway = gatewayUrl.trim().replace(/\/$/, '');
+    
+    // Safely check if gateway is pointing to the current domain itself
+    try {
+      if (cleanGateway) {
+        let gatewayHost = cleanGateway;
+        if (cleanGateway.includes('//')) {
+          gatewayHost = new URL(cleanGateway).hostname;
+        }
+        if (gatewayHost === window.location.hostname) {
+          // Self-referencing error (e.g. gateway points to the static site itself)
+          return path; 
+        }
+      }
+    } catch (e) {
+      // Invalid URL format
+    }
+
+    return `${cleanGateway}${path}`;
+  };
+
   // Helper to find device linked to a booking
   const getLinkedDeviceForBooking = (booking: Booking) => {
     return devices.find(d => {
@@ -661,7 +699,23 @@ export default function AdminDashboard() {
   const [notificationStatus, setNotificationStatus] = useState<{ initialized: boolean, projectId: string, error?: string, isStaticOnly?: boolean } | null>(null);
 
   useEffect(() => {
-    const statusUrl = gatewayUrl ? `${gatewayUrl.replace(/\/$/, '')}/api/notification-status` : '/api/notification-status';
+    const statusUrl = getApiUrl('/api/notification-status');
+    // If the status URL is identical to current /api/... and we are on a static site, skip fetching to avoid JSON errors
+    const isStaticSelfRef = !statusUrl.startsWith('http') && 
+                            !window.location.hostname.includes('.run.app') && 
+                            !window.location.hostname.includes('localhost') && 
+                            !window.location.hostname.includes('127.0.0.1');
+
+    if (isStaticSelfRef) {
+      setNotificationStatus({
+        initialized: false,
+        projectId: '',
+        isStaticOnly: true,
+        error: "لم يتم تكوين بوابة خارجية للإشعارات بعد (FCM Gateway URL) لتوجيه الطلبات من هذا الموقع الاستاتيكي."
+      });
+      return;
+    }
+
     fetch(statusUrl)
       .then(async (res) => {
         if (!res.ok) {
@@ -884,7 +938,7 @@ export default function AdminDashboard() {
       if (newNotification.deliveryMethod === 'push' || newNotification.deliveryMethod === 'both') {
         try {
           if (finalTokens.length > 0) {
-            const targetUrl = gatewayUrl ? `${gatewayUrl.replace(/\/$/, '')}/api/send-notification` : '/api/send-notification';
+            const targetUrl = getApiUrl('/api/send-notification');
             const response = await fetch(targetUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -984,7 +1038,7 @@ export default function AdminDashboard() {
       let apiSuccess = true;
       let apiErrorMsg = "";
       try {
-        const targetUrl = gatewayUrl ? `${gatewayUrl.replace(/\/$/, '')}/api/send-notification` : '/api/send-notification';
+        const targetUrl = getApiUrl('/api/send-notification');
         const response = await fetch(targetUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
