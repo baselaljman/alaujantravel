@@ -507,6 +507,7 @@ export default function AdminDashboard() {
                 <th>رقم البوليصة</th>
                 <th>المرسل</th>
                 <th>المستلم</th>
+                <th>المسار</th>
                 <th>الملاحظات</th>
                 <th>السعر</th>
                 <th>الحالة</th>
@@ -519,6 +520,7 @@ export default function AdminDashboard() {
                   <td>${p.waybillNumber}</td>
                   <td>${p.senderName}<br/><small>${p.senderPhone}</small></td>
                   <td>${p.receiverName}<br/><small>${p.receiverPhone}</small></td>
+                  <td>${p.from || trip.from} ➔ ${p.to || trip.to}</td>
                   <td>${p.note || '---'}</td>
                   <td>${p.price?.toLocaleString('ar-EG')} ${p.currency === 'SYP' ? 'ل.س' : 'ريال'}</td>
                   <td>${p.status === 'pending' ? 'قيد الانتظار' : p.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</td>
@@ -759,8 +761,8 @@ export default function AdminDashboard() {
         ...newParcel,
         waybillNumber,
         trackingNumber: selectedTrip.trackingNumber,
-        from: selectedTrip.from,
-        to: selectedTrip.to,
+        from: newParcel.from || selectedTrip.from,
+        to: newParcel.to || selectedTrip.to,
         status: 'pending',
         createdAt: new Date().toISOString()
       });
@@ -2616,12 +2618,47 @@ export default function AdminDashboard() {
                     <label className="text-xs text-stone-400 font-bold px-1">الرحلة المرتبطة</label>
                     <select 
                       value={newParcel.tripId} 
-                      onChange={e => setNewParcel({...newParcel, tripId: e.target.value})}
+                      onChange={e => {
+                        const selectedId = e.target.value;
+                        const selectedTrip = trips.find(t => t.id === selectedId);
+                        setNewParcel({
+                          ...newParcel,
+                          tripId: selectedId,
+                          from: selectedTrip ? selectedTrip.from : '',
+                          to: selectedTrip ? selectedTrip.to : ''
+                        });
+                      }}
                       className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value="">اختر الرحلة...</option>
                       {trips.filter(t => t.status === 'active' || t.status === 'scheduled').map(t => (
                         <option key={t.id} value={t.id}>{t.from} ➔ {t.to} ({t.date} - {t.time}) - {t.trackingNumber}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-stone-400 font-bold px-1">شحن من</label>
+                    <select 
+                      value={newParcel.from || ''} 
+                      onChange={e => setNewParcel({...newParcel, from: e.target.value})}
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">اختر مدينة الارسال...</option>
+                      {cities.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-stone-400 font-bold px-1">شحن إلى</label>
+                    <select 
+                      value={newParcel.to || ''} 
+                      onChange={e => setNewParcel({...newParcel, to: e.target.value})}
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">اختر مدينة الاستلام...</option>
+                      {cities.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
                       ))}
                     </select>
                   </div>
@@ -2706,6 +2743,7 @@ export default function AdminDashboard() {
                           <tr className="text-xs text-stone-400 uppercase">
                             <th className="p-4">رقم بوليصة الشحن</th>
                             <th className="p-4">المرسل والمستلم</th>
+                            <th className="p-4">المسار والوجهة</th>
                             <th className="p-4">السعر</th>
                             <th className="p-4">الحالة</th>
                             <th className="p-4">الإجراءات</th>
@@ -2720,6 +2758,11 @@ export default function AdminDashboard() {
                                   <p><span className="text-stone-400">من:</span> {parcel.senderName}</p>
                                   <p><span className="text-stone-400">إلى:</span> {parcel.receiverName}</p>
                                 </div>
+                              </td>
+                              <td className="p-4">
+                                <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-emerald-100 inline-block">
+                                  {parcel.from || trip.from} ➔ {parcel.to || trip.to}
+                                </span>
                               </td>
                               <td className="p-4 font-bold text-emerald-600">
                                 {parcel.price?.toLocaleString('ar-EG')} {parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}
