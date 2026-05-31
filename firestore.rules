@@ -41,7 +41,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isVerified() && (
-        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"]) ||
+        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"]) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
@@ -107,7 +107,7 @@ service cloud.firestore {
 
       allow create: if isOwner(userId) && (
         incoming().role == 'user' ||
-        (incoming().role == 'admin' && userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"])
+        (incoming().role == 'admin' && userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"])
       );
       allow create: if isAdmin();
       
@@ -116,7 +116,7 @@ service cloud.firestore {
         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) ||
         (incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) &&
          incoming().role == 'admin' &&
-         userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"])
+         userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"])
       );
       allow update: if isAdmin();
       allow delete: if isAdmin();

@@ -269,7 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
           if (docSnap.exists()) {
             const existingProfile = docSnap.data() as UserProfile;
-            const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"];
+            const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"];
             
             // Force admin role if email matches and not already admin
             if (user.email && adminEmails.includes(user.email.toLowerCase()) && existingProfile.role !== 'admin') {
@@ -305,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
               setProfile(newProfile);
             } else {
-              const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"];
+              const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"];
               const role = (user.email && adminEmails.includes(user.email.toLowerCase())) ? 'admin' : 'user';
               const newProfile: UserProfile = {
                 uid: user.uid,
