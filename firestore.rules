@@ -103,14 +103,20 @@ service cloud.firestore {
     // --- Users ---
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin() || hasPermission('view_users');
-      allow list: if isAdmin() || hasPermission('view_users');
+      allow list: if isAdmin() || hasPermission('view_users') || (isSignedIn() && (resource.data.email == userEmail() || resource.data.uid == request.auth.uid));
 
-      allow create: if isOwner(userId) && incoming().role == 'user';
+      allow create: if isOwner(userId) && (
+        incoming().role == 'user' ||
+        (incoming().role == 'admin' && userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"])
+      );
       allow create: if isAdmin();
       
       allow update: if isOwner(userId) && (
-        // Users can't change their own role or permissions
-        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'fcmToken', 'deviceType'])
+        // Users can't change their own role or permissions unless they are in the allowed admin list
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) &&
+         incoming().role == 'admin' &&
+         userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com"])
       );
       allow update: if isAdmin();
       allow delete: if isAdmin();
@@ -143,6 +149,7 @@ service cloud.firestore {
         isAdmin() || 
         hasPermission('view_bookings') || 
         hasPermission('staff') ||
+        hasRole('driver') ||
         // Driver of the trip can see bookings
         (exists(/databases/$(database)/documents/trips/$(resource.data.tripId)) && 
          get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.driverId == request.auth.uid)
