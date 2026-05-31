@@ -109,6 +109,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const getBookingPrice = (booking: Booking, trip: Trip) => {
+    const fromCityName = booking.from || trip.from;
+    const fromCity = cities.find(c => c.name === fromCityName);
+    const isSyrianCurrency = fromCity?.country === 'سوريا';
+
+    const bookingTo = booking.to || trip.to;
+    if (bookingTo !== trip.to && trip.stops) {
+      const matchedStop = trip.stops.find(s => s.cityName === bookingTo);
+      if (matchedStop) {
+        if (isSyrianCurrency) {
+          return { value: matchedStop.priceSYP || 0, currency: 'ل.س' };
+        } else {
+          return { value: matchedStop.priceSAR || 0, currency: 'ريال' };
+        }
+      }
+    }
+
+    if (isSyrianCurrency) {
+      return { value: trip.priceSYP || 0, currency: 'ل.س' };
+    } else {
+      return { value: trip.priceSAR || trip.price || 0, currency: 'ريال' };
+    }
+  };
+
   const handlePrintTicket = async (booking: Booking, trip: Trip) => {
     setIsPrinting(true);
     try {
@@ -161,6 +185,13 @@ export default function AdminDashboard() {
 
     const tripBookings = bookings.filter(b => b.tripId === selectedTripId);
     
+    // Chunk into pages of 45 passengers
+    const chunks = [];
+    const chunkSize = 45;
+    for (let i = 0; i < tripBookings.length; i += chunkSize) {
+      chunks.push(tripBookings.slice(i, i + chunkSize));
+    }
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -169,62 +200,73 @@ export default function AdminDashboard() {
         <head>
           <title>كشف الركاب - ${trip.from} إلى ${trip.to}</title>
           <style>
-            body { font-family: 'Arial', sans-serif; padding: 40px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 12px; text-align: right; }
+            @media print {
+              .page { page-break-after: always; break-after: page; }
+              .page:last-child { page-break-after: avoid; break-after: avoid; }
+            }
+            body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; }
+            .page { min-height: 100%; box-sizing: border-box; padding-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+            th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: right; }
             th { background-color: #f8f9fa; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #059669; padding-bottom: 20px; }
-            .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
+            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #059669; padding-bottom: 10px; position: relative; }
+            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #fafafa; padding: 8px; border-radius: 6px; }
+            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; }
           </style>
         </head>
         <body>
-          <div class="header" style="position: relative;">
-            <img 
-              src="/logoaujantravel.jpeg" 
-              crossorigin="anonymous"
-              style="position: absolute; top: 0; right: 0; width: 60px; height: 60px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
-            />
-            <h1>كشف ركاب الرحلة</h1>
-            <p>العوجان للسياحة والسفر</p>
-          </div>
-          <div class="trip-info">
-            <div><strong>من:</strong> ${trip.from}</div>
-            <div><strong>إلى:</strong> ${trip.to}</div>
-            <div><strong>التاريخ:</strong> ${formatDateArabic(trip.date)}</div>
-            <div><strong>الوقت:</strong> ${trip.time}</div>
-            <div><strong>رقم التتبع:</strong> ${trip.trackingNumber || '---'}</div>
-            <div><strong>عدد الركاب:</strong> ${tripBookings.length}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>اسم الراكب</th>
-                <th>رقم التواصل</th>
-                <th>رقم الجواز</th>
-                <th>المقعد</th>
-                <th>الوجهة</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tripBookings.map((b, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td>${b.passengerName}</td>
-                  <td>${b.passengerPhone}</td>
-                  <td>${b.passportNumber || '---'}</td>
-                  <td>${b.seatNumber}</td>
-                  <td>${b.to || trip.to}</td>
-                  <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="footer">
-            تم استخراج هذا الكشف بتاريخ ${new Date().toLocaleString('ar-EG')}
-          </div>
+          ${chunks.map((chunk, chunkIndex) => `
+            <div class="page">
+              <div class="header">
+                <img 
+                  src="/logoaujantravel.jpeg" 
+                  crossorigin="anonymous"
+                  style="position: absolute; top: 0; right: 0; width: 45px; height: 45px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+                />
+                <h1 style="margin: 0; font-size: 18px;">كشف ركاب الرحلة (صفحة ${chunkIndex + 1} من ${chunks.length})</h1>
+                <p style="margin: 3px 0 0 0; font-size: 11px;">العوجان للسياحة والسفر</p>
+              </div>
+              <div class="trip-info">
+                <div><strong>من:</strong> ${trip.from}</div>
+                <div><strong>إلى:</strong> ${trip.to}</div>
+                <div><strong>التاريخ:</strong> ${formatDateArabic(trip.date)}</div>
+                <div><strong>الوقت:</strong> ${trip.time}</div>
+                <div><strong>رقم التتبع:</strong> ${trip.trackingNumber || '---'}</div>
+                <div><strong>الركاب في الصفحة:</strong> ${chunk.length} / الإجمالي: ${tripBookings.length}</div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>اسم الراكب</th>
+                    <th>رقم التواصل</th>
+                    <th>رقم الجواز</th>
+                    <th>المقعد</th>
+                    <th>الوجهة</th>
+                    <th>الطرود الإضافية</th>
+                    <th>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${chunk.map((b, i) => `
+                    <tr>
+                      <td>${chunkIndex * chunkSize + i + 1}</td>
+                      <td>${b.passengerName}</td>
+                      <td>${b.passengerPhone}</td>
+                      <td>${b.passportNumber || '---'}</td>
+                      <td>${b.seatNumber}</td>
+                      <td>${b.to || trip.to}</td>
+                      <td>${b.extraParcelsCount ? `${b.extraParcelsCount} طرود` : '---'}</td>
+                      <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <div class="footer">
+                تم استخراج هذا الكشف بتاريخ ${new Date().toLocaleString('ar-EG')}
+              </div>
+            </div>
+          `).join('')}
           <script>
             window.onload = function() {
               const images = document.getElementsByTagName('img');
@@ -253,6 +295,174 @@ export default function AdminDashboard() {
     printWindow.document.write(html);
     printWindow.document.close();
   };
+
+  const handlePrintFinancialPassengerList = () => {
+    const trip = trips.find(t => t.id === selectedTripId);
+    if (!trip) return;
+
+    const tripBookings = bookings.filter(b => b.tripId === selectedTripId);
+    
+    let totalSAR = 0;
+    let totalSYP = 0;
+    let hasSAR = false;
+    let hasSYP = false;
+
+    const bookingPrices = tripBookings.map(b => {
+      const priceInfo = getBookingPrice(b, trip);
+      const extra = b.extraParcelsPrice || 0;
+      const combinedValue = priceInfo.value + extra;
+      if (priceInfo.currency === 'ل.س') {
+        totalSYP += combinedValue;
+        hasSYP = true;
+      } else {
+        totalSAR += combinedValue;
+        hasSAR = true;
+      }
+      return {
+        currency: priceInfo.currency,
+        baseValue: priceInfo.value,
+        extra,
+        totalValue: combinedValue
+      };
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const totalTextParts = [];
+    if (hasSAR) totalTextParts.push(`${totalSAR} ريال`);
+    if (hasSYP) totalTextParts.push(`${totalSYP} ل.س`);
+    const totalText = totalTextParts.join(' / ') || '0';
+
+    // Chunk into pages of 45 passengers
+    const chunks = [];
+    const chunkSize = 45;
+    for (let i = 0; i < tripBookings.length; i += chunkSize) {
+      chunks.push(tripBookings.slice(i, i + chunkSize));
+    }
+
+    const html = `
+      <html dir="rtl">
+        <head>
+          <title>الكشف المالي للركاب - ${trip.from} إلى ${trip.to}</title>
+          <style>
+            @media print {
+              .page { page-break-after: always; break-after: page; }
+              .page:last-child { page-break-after: avoid; break-after: avoid; }
+            }
+            body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; }
+            .page { min-height: 100%; box-sizing: border-box; padding-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+            th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: right; }
+            th { background-color: #f8f9fa; }
+            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #059669; padding-bottom: 10px; position: relative; }
+            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #fafafa; padding: 8px; border-radius: 6px; }
+            .summary-box { background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; font-weight: bold; color: #166534; display: flex; justify-content: space-between; }
+            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; }
+          </style>
+        </head>
+        <body>
+          ${chunks.map((chunk, chunkIndex) => {
+            const isLastPage = chunkIndex === chunks.length - 1;
+            return `
+              <div class="page">
+                <div class="header">
+                  <img 
+                    src="/logoaujantravel.jpeg" 
+                    crossorigin="anonymous"
+                    style="position: absolute; top: 0; right: 0; width: 45px; height: 45px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+                  />
+                  <h1 style="margin: 0; font-size: 18px;">الكشف المالي والركاب للرحلة (صفحة ${chunkIndex + 1} من ${chunks.length})</h1>
+                  <p style="margin: 3px 0 0 0; font-size: 11px;">العوجان للسياحة والسفر</p>
+                </div>
+                <div class="trip-info">
+                  <div><strong>من:</strong> ${trip.from}</div>
+                  <div><strong>إلى:</strong> ${trip.to}</div>
+                  <div><strong>التاريخ:</strong> ${formatDateArabic(trip.date)}</div>
+                  <div><strong>الوقت:</strong> ${trip.time}</div>
+                  <div><strong>رقم التتبع:</strong> ${trip.trackingNumber || '---'}</div>
+                  <div><strong>الركاب في الصفحة:</strong> ${chunk.length} / الإجمالي: ${tripBookings.length}</div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>اسم الراكب</th>
+                      <th>رقم التواصل</th>
+                      <th>رقم الجواز</th>
+                      <th>المقعد</th>
+                      <th>الوجهة</th>
+                      <th>الطرود الإضافية</th>
+                      <th>سعر التذكرة الإجمالي</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${chunk.map((b, i) => {
+                      const absoluteIndex = chunkIndex * chunkSize + i;
+                      const priceInfo = bookingPrices[absoluteIndex];
+                      return `
+                        <tr>
+                          <td>${absoluteIndex + 1}</td>
+                          <td>${b.passengerName}</td>
+                          <td>${b.passengerPhone}</td>
+                          <td>${b.passportNumber || '---'}</td>
+                          <td>${b.seatNumber}</td>
+                          <td>${b.to || trip.to}</td>
+                          <td>${b.extraParcelsCount ? `${b.extraParcelsCount} طرود (+${priceInfo.extra} ${priceInfo.currency})` : '---'}</td>
+                          <td style="font-weight: bold; color: #059669;">
+                            ${priceInfo.totalValue} ${priceInfo.currency}
+                            ${priceInfo.extra > 0 ? `<div style="font-size: 9px; color: #666; font-weight: normal;">(أساسي: ${priceInfo.baseValue} + طرود: ${priceInfo.extra})</div>` : ''}
+                          </td>
+                          <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+                
+                ${isLastPage ? `
+                  <div class="summary-box">
+                    <span>إجمالي مبالغ الرحلة:</span>
+                    <span>${totalText}</span>
+                  </div>
+                ` : ''}
+
+                <div class="footer">
+                  تم استخراج هذا الكشف المالي بتاريخ ${new Date().toLocaleString('ar-EG')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+          <script>
+            window.onload = function() {
+              const images = document.getElementsByTagName('img');
+              let loaded = 0;
+              if (images.length === 0) {
+                window.print();
+                window.onafterprint = () => window.close();
+                return;
+              }
+              const check = () => {
+                loaded++;
+                if (loaded === images.length) {
+                  setTimeout(() => { window.print(); window.onafterprint = () => window.close(); }, 500);
+                }
+              };
+              for (let img of images) {
+                if (img.complete) check();
+                else { img.onload = check; img.onerror = check; }
+              }
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const handlePrintTripParcels = (trip: Trip, tripParcels: Parcel[]) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -356,7 +566,9 @@ export default function AdminDashboard() {
     passengerName: '',
     passengerPhone: '',
     passportNumber: '',
-    seatNumber: 0
+    seatNumber: 0,
+    extraParcelsCount: 0,
+    extraParcelsPrice: 0
   });
 
   useEffect(() => {
@@ -966,7 +1178,9 @@ export default function AdminDashboard() {
       passengerName: booking.passengerName,
       passengerPhone: booking.passengerPhone,
       passportNumber: booking.passportNumber || '',
-      seatNumber: booking.seatNumber
+      seatNumber: booking.seatNumber,
+      extraParcelsCount: booking.extraParcelsCount || 0,
+      extraParcelsPrice: booking.extraParcelsPrice || 0
     });
   };
 
@@ -1775,15 +1989,24 @@ export default function AdminDashboard() {
                     })()}
                   </div>
 
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
                     <h3 className="font-bold text-emerald-600">قائمة الحجوزات</h3>
-                    <button 
-                      onClick={handlePrintPassengerList}
-                      className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2 rounded-xl text-sm transition-colors"
-                    >
-                      <Printer size={16} />
-                      طباعة الكشف كامل
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={handlePrintPassengerList}
+                        className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2 rounded-xl text-sm transition-colors"
+                      >
+                        <Printer size={16} />
+                        طباعة الكشف كامل
+                      </button>
+                      <button 
+                        onClick={handlePrintFinancialPassengerList}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm transition-colors font-bold shadow-sm"
+                      >
+                        <Printer size={16} />
+                        طباعة الكشف المالي
+                      </button>
+                    </div>
                   </div>
 
                   <div className="overflow-x-auto w-full -mx-4 sm:mx-0">
@@ -1819,6 +2042,30 @@ export default function AdminDashboard() {
                                     className="bg-white border p-1 rounded w-full text-xs"
                                     placeholder="رقم الهاتف"
                                   />
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <label className="text-[9px] text-stone-450 block font-bold">الطرود الإضافية</label>
+                                      <input 
+                                        type="number" 
+                                        min="0"
+                                        placeholder="عدد الطرود"
+                                        value={editBookingData.extraParcelsCount || 0} 
+                                        onChange={e => setEditBookingData({...editBookingData, extraParcelsCount: Number(e.target.value)})}
+                                        className="bg-white border p-1 rounded w-full text-xs animate-none"
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="text-[9px] text-stone-450 block font-bold">السعر الإضافي</label>
+                                      <input 
+                                        type="number" 
+                                        min="0"
+                                        placeholder="السعر الإضافي"
+                                        value={editBookingData.extraParcelsPrice || 0} 
+                                        onChange={e => setEditBookingData({...editBookingData, extraParcelsPrice: Number(e.target.value)})}
+                                        className="bg-white border p-1 rounded w-full text-xs animate-none"
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
                               ) : (
                                 <>
@@ -1829,6 +2076,16 @@ export default function AdminDashboard() {
                                       {booking.from} ← {booking.to}
                                     </p>
                                   )}
+                                  {booking.extraParcelsCount ? (
+                                    <p className="text-[10px] text-amber-700 font-bold mt-1 bg-amber-50 px-1.5 py-0.5 rounded w-max border border-amber-100 flex items-center gap-1">
+                                      <span>📦 طرود إضافية: {booking.extraParcelsCount} | +{booking.extraParcelsPrice || 0} {
+                                        (() => {
+                                          const tripObj = trips.find(t => t.id === booking.tripId);
+                                          return tripObj ? getBookingPrice(booking, tripObj).currency : 'ريال';
+                                        })()
+                                      }</span>
+                                    </p>
+                                  ) : null}
                                   {(() => {
                                     const linkedDevice = getLinkedDeviceForBooking(booking);
                                     if (linkedDevice) {
@@ -2051,6 +2308,23 @@ export default function AdminDashboard() {
                                         <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>المقعد</p>
                                         <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#059669' }}>{booking.seatNumber}</p>
                                       </div>
+                                      {(() => {
+                                        const tripObj = trips.find(t => t.id === booking.tripId);
+                                        const priceInfo = tripObj ? getBookingPrice(booking, tripObj) : { value: 0, currency: '' };
+                                        const extra = booking.extraParcelsPrice || 0;
+                                        const total = priceInfo.value + extra;
+                                        return (
+                                          <div style={{ flex: 1 }}>
+                                            <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>سعر التذكرة</p>
+                                            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '16px', color: '#059669' }}>{total} {priceInfo.currency}</p>
+                                            {extra > 0 && (
+                                              <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#b45309', fontWeight: 'bold' }}>
+                                                (يشمل {booking.extraParcelsCount} طرود: +{extra} {priceInfo.currency})
+                                              </p>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
 
@@ -2088,6 +2362,19 @@ export default function AdminDashboard() {
                                       <div>
                                         <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>المقعد</p>
                                         <p style={{ margin: 0, fontWeight: 'bold', fontSize: '12px', color: '#059669' }}>{booking.seatNumber}</p>
+                                      </div>
+                                      <div>
+                                        <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>السعر</p>
+                                        {(() => {
+                                          const tripObj = trips.find(t => t.id === booking.tripId);
+                                          const priceInfo = tripObj ? getBookingPrice(booking, tripObj) : { value: 0, currency: '' };
+                                          const extra = booking.extraParcelsPrice || 0;
+                                          return (
+                                            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#059669' }}>
+                                              {priceInfo.value + extra} {priceInfo.currency}
+                                            </p>
+                                          );
+                                        })()}
                                       </div>
                                     </div>
                                     <div style={{ marginTop: '20px', textAlign: 'center' }}>

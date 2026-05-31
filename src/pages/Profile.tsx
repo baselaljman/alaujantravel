@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, where, onSnapshot, or } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
-import { Booking, Trip } from '../types';
+import { Booking, Trip, City } from '../types';
 import { Calendar, Download, MapPin, Ticket, User, Loader2, Share as ShareIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import html2canvas from 'html2canvas';
@@ -15,7 +15,39 @@ export default function Profile() {
   const [bookings, setBookings] = useState<(Booking & { trip?: Trip })[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [cities, setCities] = useState<City[]>([]);
   const ticketRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsubCities = onSnapshot(collection(db, 'cities'), (snap) => {
+      setCities(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as City)));
+    });
+    return () => unsubCities();
+  }, []);
+
+  const getBookingPrice = (booking: Booking, trip: Trip) => {
+    const fromCityName = booking.from || trip.from;
+    const fromCity = cities.find(c => c.name === fromCityName);
+    const isSyrianCurrency = fromCity?.country === 'سوريا';
+
+    const bookingTo = booking.to || trip.to;
+    if (bookingTo !== trip.to && trip.stops) {
+      const matchedStop = trip.stops.find(s => s.cityName === bookingTo);
+      if (matchedStop) {
+        if (isSyrianCurrency) {
+          return { value: matchedStop.priceSYP || 0, currency: 'ل.س' };
+        } else {
+          return { value: matchedStop.priceSAR || 0, currency: 'ريال' };
+        }
+      }
+    }
+
+    if (isSyrianCurrency) {
+      return { value: trip.priceSYP || 0, currency: 'ل.س' };
+    } else {
+      return { value: trip.priceSAR || trip.price || 0, currency: 'ريال' };
+    }
+  };
 
   const formatDateArabic = (dateStr: string) => {
     try {
@@ -336,10 +368,19 @@ export default function Profile() {
                                 <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#065f46', margin: 0 }}>{trip.to}</p>
                               </div>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>التاريخ</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{formatDateArabic(trip.date)}</p></div>
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>الوقت</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{trip.time}</p></div>
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>المقعد</p><p style={{ fontWeight: 'bold', fontSize: '12px', color: '#1c1917', margin: 0 }}>{booking.seatNumber}</p></div>
+                              <div>
+                                <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a29e', margin: 0 }}>السعر</p>
+                                <p style={{ fontWeight: 'bold', fontSize: '12px', color: '#059669', margin: 0 }}>
+                                  {(() => {
+                                    const priceInfo = getBookingPrice(booking, trip);
+                                    return `${priceInfo.value} ${priceInfo.currency}`;
+                                  })()}
+                                </p>
+                              </div>
                             </div>
                             <div style={{ backgroundColor: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                               <p style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', margin: 0 }}>🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً</p>

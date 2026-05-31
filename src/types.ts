@@ -73,6 +73,8 @@ export interface Booking {
   status: 'confirmed' | 'pending' | 'cancelled';
   from?: string;
   to?: string;
+  extraParcelsCount?: number;
+  extraParcelsPrice?: number;
 }
 
 export interface Parcel {
