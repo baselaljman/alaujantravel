@@ -1551,22 +1551,22 @@ export default function AdminDashboard() {
                     السبب في عدم وصول الإشعارات عند الإرسال من خلال موقعكم الخارجي (<strong>https://alaujantravel.com</strong>) يعود لعدم تشغيل خادم خلفي نشط بنفس الطريقة:
                   </p>
                   <ul className="list-decimal list-inside space-y-2.5 pr-2">
-                    <td className="leading-relaxed block">
+                    <li className="leading-relaxed block">
                       <strong className="text-rose-800">1. لا يوجد خادم Node.js مفعل بموقعكم (رفع الموقع كملفات Static فقط):</strong>
                       <div className="mt-1 mr-4 text-stone-700">
                         إذا تم استخدام أمر البناء <code>npm run build</code> ورفع محتويات المجلد <code>dist</code> كملفات استاتيكية (Static SPA) فقط إلى استضافة مشتركة (مثل Hostinger أو cPanel)، سيعمل كل شيء بالموقع (بما فيه قاعدة بيانات الحجوزات والرحلات) لأنها تعمل مباشرة من المتصفح، <strong>لكن الإشعارات الفورية للهواتف ستفشل دائماً</strong>؛ لأسباب أمنية، يتطلب إرسال الإشارة لـ Firebase استدعاء الواجهة الخلفية الآمنة لـ (Firebase Admin) <code>/api/send-notification</code>.
                         <div className="mt-1 font-bold text-stone-800">📌 الحل المقترح:</div>
                         يجب رفع الكود بالكامل وتشغيل أمر البدء <code>node dist/server.cjs</code> على استضافة قادرة على دعم تشغيل NodeJS (مثل سيرفر VPS، أو تفعيل تطبيق Node من داخل لوحة CPanel في الاستضافة، أو استخدام Render/Heroku/Cloud Run).
                       </div>
-                    </td>
-                    <td className="leading-relaxed block">
+                    </li>
+                    <li className="leading-relaxed block">
                       <strong className="text-rose-800">2. فقدان ترخيص الخدمة (Environment Secret Var):</strong>
                       <div className="mt-1 mr-4 text-stone-700">
                         إذا كان خادم NodeJS يعمل بالفعل على النطاق الخارجي ولكن الإشعارات لا تخرج، فهذا يعني أنكم لم تقوموا بتمرير رمز الحساب الخدمي الآمن كمتغير بيئة.
                         <div className="mt-1 font-bold text-stone-800">📌 الحل المقترح:</div>
                         يجب عليكم الذهاب إلى لوحة تحكم الاستضافة الخاصة بك (الإعدادات البيئية أو Environment Variables)، وإضافة متغير جديد بالاسم: <code>FIREBASE_SERVICE_ACCOUNT</code> ووضع البيانات النصية السرية الكاملة لملف الحساب الخدمي (Service Account Key) المستخرج من لوحة تحكم Firebase Web Console كقيمة له.
                       </div>
-                    </td>
+                    </li>
                   </ul>
                 </div>
               )}
