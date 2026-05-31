@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, 
-  query, where, runTransaction, getDocs 
+  query, where, runTransaction, getDocs, setDoc
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel, Notification, TripStop, Device } from '../types';
@@ -35,6 +35,8 @@ export default function AdminDashboard() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ coll: string, id: string, label: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gatewayUrl, setGatewayUrl] = useState<string>('');
+  const [isSavingGateway, setIsSavingGateway] = useState<boolean>(false);
 
   // Form States
   const [newTrip, setNewTrip] = useState<Partial<Trip>>({
@@ -632,6 +634,14 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.LIST, 'devices');
     });
 
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
+      if (snap.exists()) {
+        setGatewayUrl(snap.data().notificationGatewayUrl || '');
+      }
+    }, (error) => {
+      console.warn("Could not load global settings:", error);
+    });
+
     setLoading(false);
     return () => {
       unsubTrips();
@@ -643,6 +653,7 @@ export default function AdminDashboard() {
       unsubParcels();
       unsubNotifications();
       unsubDevices();
+      unsubSettings();
     };
   }, [profile]);
 
@@ -650,7 +661,8 @@ export default function AdminDashboard() {
   const [notificationStatus, setNotificationStatus] = useState<{ initialized: boolean, projectId: string, error?: string, isStaticOnly?: boolean } | null>(null);
 
   useEffect(() => {
-    fetch('/api/notification-status')
+    const statusUrl = gatewayUrl ? `${gatewayUrl.replace(/\/$/, '')}/api/notification-status` : '/api/notification-status';
+    fetch(statusUrl)
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(`خطأ في استجابة الخادم: ${res.status}`);
@@ -672,7 +684,7 @@ export default function AdminDashboard() {
           error: err.message
         });
       });
-  }, []);
+  }, [gatewayUrl]);
 
   const handleUpdateTripStatus = async (tripId: string, status: string) => {
     try {
@@ -872,7 +884,8 @@ export default function AdminDashboard() {
       if (newNotification.deliveryMethod === 'push' || newNotification.deliveryMethod === 'both') {
         try {
           if (finalTokens.length > 0) {
-            const response = await fetch('/api/send-notification', {
+            const targetUrl = gatewayUrl ? `${gatewayUrl.replace(/\/$/, '')}/api/send-notification` : '/api/send-notification';
+            const response = await fetch(targetUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -971,7 +984,8 @@ export default function AdminDashboard() {
       let apiSuccess = true;
       let apiErrorMsg = "";
       try {
-        const response = await fetch('/api/send-notification', {
+        const targetUrl = gatewayUrl ? `${gatewayUrl.replace(/\/$/, '')}/api/send-notification` : '/api/send-notification';
+        const response = await fetch(targetUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1476,6 +1490,57 @@ export default function AdminDashboard() {
                      notificationStatus.initialized ? 'خدمة الإشعارات (FCM) مفعلة' : 'خدمة الإشعارات (FCM) تتطلب إعداد ملف الخدمة'}
                   </div>
                 )}
+              </div>
+
+              {/* FCM Gateway Config Card */}
+              <div className="bg-white p-6 rounded-2xl border border-stone-200/80 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                  <Smartphone size={20} />
+                  <h3>إعدادات خادم وممر الإشعارات الفورية (FCM Gateway URL)</h3>
+                </div>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  إذا كنت تقوم بتشغيل الموقع على نطاق خارجي استاتيكي مثل <strong>alaujantravel.com</strong> بدون بيئة خادم نشطة، فلن تتمكن المتصفحات من معالجة مفاتيح إرسال Firebase مباشرة لدواعي الحماية. يمكنك توجيه طلبات الإرسال لخادم نشط (مثل رابط بيئة العمل الحالية على Cloud Run) ليعمل كبوابة وسيطة آمنة وموثوقة.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input 
+                    type="text" 
+                    placeholder="مثال: https://ais-pre-...run.app" 
+                    value={gatewayUrl}
+                    onChange={(e) => setGatewayUrl(e.target.value)}
+                    className="flex-1 bg-stone-50 p-3 rounded-xl border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    onClick={async () => {
+                      try {
+                        setIsSavingGateway(true);
+                        await setDoc(doc(db, 'settings', 'global'), { notificationGatewayUrl: gatewayUrl }, { merge: true });
+                        setError('تم حفظ معرّف رابط بوابة الإشعارات بنجاح!');
+                        setTimeout(() => setError(null), 5000);
+                      } catch (err: any) {
+                        setError(`فشل حفظ المعرّف: ${err.message}`);
+                      } finally {
+                        setIsSavingGateway(false);
+                      }
+                    }}
+                    disabled={isSavingGateway}
+                    className="bg-emerald-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-emerald-700 transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    {isSavingGateway ? 'جاري الحفظ...' : 'حفظ التكوين'}
+                  </button>
+                </div>
+
+                <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 text-xs text-emerald-800 space-y-1">
+                  <span className="font-bold block">💡 كيف تستخدم هذه الميزة لتفعيل الإشعارات على alaujantravel.com؟</span>
+                  <p className="leading-relaxed text-stone-600">
+                    1. قم بنسخ رابط بيئة العمل الحالية المعروض بالأسفل وإلصاقه في الخانة العلوية:
+                    <br />
+                    <code className="bg-white px-2 py-0.5 rounded border font-mono select-all text-emerald-700 font-bold mt-1 inline-block">{window.location.origin}</code>
+                  </p>
+                  <p className="leading-relaxed text-stone-600">
+                    2. اضغط على <strong>"حفظ التكوين"</strong>. بمجرد الحفظ، ستقوم قاعدة بيانات الـ Firestore بتوزيع الرابط تلقائياً لجميع لوحات الإدارة الفعالة بما فيها موقعكمalaujantravel.com وبث الإعلانات بنجاح!
+                  </p>
+                </div>
               </div>
               
               {notificationStatus?.isStaticOnly && (
