@@ -647,13 +647,31 @@ export default function AdminDashboard() {
   }, [profile]);
 
   // Handlers
-  const [notificationStatus, setNotificationStatus] = useState<{ initialized: boolean, projectId: string } | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState<{ initialized: boolean, projectId: string, error?: string, isStaticOnly?: boolean } | null>(null);
 
   useEffect(() => {
     fetch('/api/notification-status')
-      .then(res => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`خطأ في استجابة الخادم: ${res.status}`);
+        }
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          return res.json();
+        } else {
+          throw new Error("استجابة الخادم ليست JSON؛ قد يكون الخادم الخارجي يعمل كموقع استاتيكي (Static Site) فقط.");
+        }
+      })
       .then(data => setNotificationStatus(data))
-      .catch(err => console.error('Error fetching notification status:', err));
+      .catch(err => {
+        console.error('Error fetching notification status:', err);
+        setNotificationStatus({
+          initialized: false,
+          projectId: '',
+          isStaticOnly: true,
+          error: err.message
+        });
+      });
   }, []);
 
   const handleUpdateTripStatus = async (tripId: string, status: string) => {
@@ -1006,18 +1024,38 @@ export default function AdminDashboard() {
         <head>
           <title>فاتورة شحن طرد - ${parcel.waybillNumber}</title>
           <style>
-            body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; }
-            .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, .15); font-size: 16px; line-height: 24px; }
-            .header { border-bottom: 2px solid #059669; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-            .company-info h1 { margin: 0; color: #059669; }
-            .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .section-title { font-weight: bold; color: #059669; border-bottom: 1px solid #eee; margin-bottom: 10px; padding-bottom: 5px; }
-            .info-row { margin-bottom: 8px; }
+            @page {
+              size: A4 portrait;
+              margin: 8mm;
+            }
+            body { font-family: 'Arial', sans-serif; padding: 15px; color: #333; background: #fff; margin: 0; }
+            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, .05); font-size: 14px; line-height: 1.4; border-radius: 8px; }
+            .header { border-bottom: 2px solid #059669; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+            .company-info h1 { margin: 0; color: #059669; font-size: 20px; }
+            .company-info p { margin: 2px 0 0 0; font-size: 13px; color: #666; }
+            .tracking p { margin: 2px 0; font-size: 13px; }
+            .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+            .section-title { font-weight: bold; color: #059669; border-bottom: 1px solid #eee; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px; }
+            .info-row { margin-bottom: 4px; font-size: 12px; }
             .info-label { font-weight: bold; color: #666; }
-            .price-section { margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 10px; text-align: left; }
-            .total-price { font-size: 24px; font-weight: bold; color: #059669; }
-            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
-            @media print { .no-print { display: none; } }
+            .price-section { margin-top: 15px; padding: 12px 15px; background: #f9f9f9; border-radius: 8px; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+            .price-section .info-label { font-size: 13px; margin: 0; }
+            .total-price { font-size: 18px; font-weight: bold; color: #059669; margin: 0; }
+            .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+            @media print {
+              .no-print { display: none; }
+              body { padding: 0; margin: 0; }
+              .invoice-box { padding: 10px; border: none; box-shadow: none; max-width: 100%; }
+              @page {
+                size: A4 portrait;
+                margin: 5mm;
+              }
+              .terms-section { font-size: 9px !important; line-height: 1.4 !important; padding: 6px !important; margin-top: 10px !important; }
+              .price-section { padding: 8px 12px; margin-top: 10px; }
+              .invoice-details { margin-bottom: 8px; gap: 10px; }
+              .header { margin-bottom: 8px; padding-bottom: 6px; }
+              .footer { margin-top: 8px; padding-top: 6px; }
+            }
           </style>
         </head>
         <body>
@@ -1070,6 +1108,36 @@ export default function AdminDashboard() {
             <div class="price-section">
               <span class="info-label">إجمالي تكلفة الشحن:</span>
               <div class="total-price">${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}</div>
+            </div>
+
+            <div class="terms-section" style="margin-top: 25px; border: 1px dashed #ddd; border-radius: 8px; padding: 15px; background: #fafafa; font-size: 11px; color: #555; line-height: 1.8; text-align: right;">
+              <div style="font-size: 13px; font-weight: bold; color: #059669; margin-bottom: 8px; border-bottom: 2px solid #059669; padding-bottom: 4px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
+              <ul style="padding-right: 15px; margin: 0; list-style-type: none;">
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
+                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                  الشركة غير مسؤولة عن البضائع إذا لم يتم إستلامها خلال ١٠ أيام وعن سندات الاستلام بعد ١٥ يوم من تاريخ الاستلام.
+                </li>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
+                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                  الشركة غير مسؤولة عما بداخل الإرساليه من أشياء قابله للكسر أو ثمينة بدون تأمين من قبلنا.
+                </li>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
+                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                  في حالة فقدان الارسالية الشركة لا تتحمل أكثر من ١٠٠ ريال كقيمة الارسالية إذا لم يتم تأمين عليه من قبلنا.
+                </li>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
+                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">•</span>
+                  استلامك الفاتورة يعتبر إطلاعك على الشروط.
+                </li>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
+                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                  الشركة لا تتحمل مسؤولية الإرسالية في حالة تعرضها لكوارث طبيعية ولم يكتب عليها الاسم أو رقم التواصل.
+                </li>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
+                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                  الشركة غير مسؤولة عن مابداخل الإرسالية الغير مصرح بها.
+                </li>
+              </ul>
             </div>
 
             <div class="footer">
@@ -1396,14 +1464,49 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">إدارة الإشعارات</h2>
                 {notificationStatus && (
-                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${notificationStatus.initialized ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${notificationStatus.initialized ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                    {notificationStatus.initialized ? 'خدمة الإشعارات (FCM) مفعلة' : 'خدمة الإشعارات (FCM) تتطلب إعداد ملف الخدمة'}
+                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${
+                    notificationStatus.isStaticOnly ? 'bg-rose-100 text-rose-600' :
+                    notificationStatus.initialized ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      notificationStatus.isStaticOnly ? 'bg-rose-500 animate-pulse' :
+                      notificationStatus.initialized ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
+                    }`} />
+                    {notificationStatus.isStaticOnly ? 'تعذر الاتصال بخادم الإشعارات في الموقع الخارجي' :
+                     notificationStatus.initialized ? 'خدمة الإشعارات (FCM) مفعلة' : 'خدمة الإشعارات (FCM) تتطلب إعداد ملف الخدمة'}
                   </div>
                 )}
               </div>
               
-              {!notificationStatus?.initialized && (
+              {notificationStatus?.isStaticOnly && (
+                <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl text-rose-950 text-xs space-y-3 shadow-sm">
+                  <p className="font-bold text-sm text-rose-700 flex items-center gap-1.5">⚠️ تنبيه تقني وتوجيه لحل المشكلة على موقعكم الأساسي (alaujantravel.com):</p>
+                  <p className="leading-relaxed text-stone-700">
+                    عند إرسال إشعار من داخل بيئة العمل الحالية (هنا)، يصل الإشعار للعميل بنجاح لأن الخادم الخلفي (Node.js backend) نشط ومكتمل التكوين هنا.
+                    السبب في عدم وصول الإشعارات عند الإرسال من خلال موقعكم الخارجي (<strong>https://alaujantravel.com</strong>) يعود لعدم تشغيل خادم خلفي نشط بنفس الطريقة:
+                  </p>
+                  <ul className="list-decimal list-inside space-y-2.5 pr-2">
+                    <td className="leading-relaxed block">
+                      <strong className="text-rose-800">1. لا يوجد خادم Node.js مفعل بموقعكم (رفع الموقع كملفات Static فقط):</strong>
+                      <div className="mt-1 mr-4 text-stone-700">
+                        إذا تم استخدام أمر البناء <code>npm run build</code> ورفع محتويات المجلد <code>dist</code> كملفات استاتيكية (Static SPA) فقط إلى استضافة مشتركة (مثل Hostinger أو cPanel)، سيعمل كل شيء بالموقع (بما فيه قاعدة بيانات الحجوزات والرحلات) لأنها تعمل مباشرة من المتصفح، <strong>لكن الإشعارات الفورية للهواتف ستفشل دائماً</strong>؛ لأسباب أمنية، يتطلب إرسال الإشارة لـ Firebase استدعاء الواجهة الخلفية الآمنة لـ (Firebase Admin) <code>/api/send-notification</code>.
+                        <div className="mt-1 font-bold text-stone-800">📌 الحل المقترح:</div>
+                        يجب رفع الكود بالكامل وتشغيل أمر البدء <code>node dist/server.cjs</code> على استضافة قادرة على دعم تشغيل NodeJS (مثل سيرفر VPS، أو تفعيل تطبيق Node من داخل لوحة CPanel في الاستضافة، أو استخدام Render/Heroku/Cloud Run).
+                      </div>
+                    </td>
+                    <td className="leading-relaxed block">
+                      <strong className="text-rose-800">2. فقدان ترخيص الخدمة (Environment Secret Var):</strong>
+                      <div className="mt-1 mr-4 text-stone-700">
+                        إذا كان خادم NodeJS يعمل بالفعل على النطاق الخارجي ولكن الإشعارات لا تخرج، فهذا يعني أنكم لم تقوموا بتمرير رمز الحساب الخدمي الآمن كمتغير بيئة.
+                        <div className="mt-1 font-bold text-stone-800">📌 الحل المقترح:</div>
+                        يجب عليكم الذهاب إلى لوحة تحكم الاستضافة الخاصة بك (الإعدادات البيئية أو Environment Variables)، وإضافة متغير جديد بالاسم: <code>FIREBASE_SERVICE_ACCOUNT</code> ووضع البيانات النصية السرية الكاملة لملف الحساب الخدمي (Service Account Key) المستخرج من لوحة تحكم Firebase Web Console كقيمة له.
+                      </div>
+                    </td>
+                  </ul>
+                </div>
+              )}
+              
+              {!notificationStatus?.isStaticOnly && !notificationStatus?.initialized && (
                 <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl text-amber-800 text-xs space-y-2">
                   <p className="font-bold">تنبيه: خدمة الإشعارات (Push) غير مكتملة الإعداد</p>
                   <p>لإرسال إشعارات حقيقية للهواتف، يجب توفير الملفات التالية:</p>
