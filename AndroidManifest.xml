@@ -2,14 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.aloujan.bus">
 
-    <!-- 1. صلاحيات الموقع الأساسية -->
+    <!-- 1. صلاحيات الموقع الأساسية (أثناء استخدام التطبيق فقط) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     
-    <!-- 2. صلاحية الوصول للموقع في الخلفية (مهمة جداً للأندرويد 10 فما فوق) -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    
-    <!-- 3. صلاحيات الخدمة الأمامية (مهمة للأندرويد 9 فما فوق) -->
+    <!-- 2. صلاحيات الخدمة الأمامية (مهمة للأندرويد 9 فما فوق) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
