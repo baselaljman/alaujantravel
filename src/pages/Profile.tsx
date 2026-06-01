@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, or } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, or, deleteDoc, getDocs, doc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { Booking, Trip, City } from '../types';
-import { Calendar, Download, MapPin, Ticket, User, Loader2, Share as ShareIcon } from 'lucide-react';
+import { Calendar, Download, MapPin, Ticket, User, Loader2, Share as ShareIcon, Trash2, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import { Capacitor } from '@capacitor/core';
@@ -11,12 +11,15 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
 export default function Profile() {
-  const { user, profile } = useAuth();
+  const { user, profile, logout } = useAuth();
   const [bookings, setBookings] = useState<(Booking & { trip?: Trip })[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [cities, setCities] = useState<City[]>([]);
   const ticketRef = useRef<HTMLDivElement>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingProgress, setDeletingProgress] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubCities = onSnapshot(collection(db, 'cities'), (snap) => {
@@ -199,6 +202,56 @@ export default function Profile() {
     return unsubscribe;
   }, []);
 
+  const handleDeleteAccountCombined = async () => {
+    if (!user) return;
+    setDeletingProgress(true);
+    setDeleteError(null);
+    try {
+      // 1. Delete Firestore user document
+      const userDocRef = doc(db, 'users', user.uid);
+      await deleteDoc(userDocRef);
+
+      // 2. Delete Firestore bookings for this user
+      const bookingsQuery = query(collection(db, 'bookings'), where('userId', '==', user.uid));
+      try {
+        const bookingsSnapshot = await getDocs(bookingsQuery);
+        const deletePromises = bookingsSnapshot.docs.map(bDoc => deleteDoc(bDoc.ref));
+        await Promise.all(deletePromises);
+      } catch (bkErr) {
+        console.warn('Could not delete some bookings:', bkErr);
+      }
+
+      // 3. Delete linked devices if any
+      const devicesQuery = query(collection(db, 'devices'), where('userId', '==', user.uid));
+      try {
+        const devicesSnapshot = await getDocs(devicesQuery);
+        const devicePromises = devicesSnapshot.docs.map(dDoc => deleteDoc(dDoc.ref));
+        await Promise.all(devicePromises);
+      } catch (devErr) {
+        console.warn('Could not delete some devices:', devErr);
+      }
+
+      // 4. Attempt to delete Firebase Auth user account
+      try {
+        await user.delete();
+      } catch (authErr: any) {
+        console.warn('Firebase Auth user deletion failed:', authErr);
+        // If it requires recent login, we must sign out since data is already deleted
+        await logout();
+        setDeleteModalOpen(false);
+        alert('تم حذف بياناتك الشخصية وحجوزاتك بنجاح من قاعدة البيانات. لتجربة حذف الحساب بالكامل من نظام المصادقة، يرجى تسجيل الدخول مجدداً ثم إتمام العملية.');
+        return;
+      }
+
+      setDeleteModalOpen(false);
+    } catch (err: any) {
+      console.error('Error deleting account:', err);
+      setDeleteError(err.message || 'حدث خطأ أثناء حذف الحساب. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setDeletingProgress(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
@@ -210,14 +263,23 @@ export default function Profile() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex items-center gap-4">
-        <div className="bg-emerald-100 p-4 rounded-full text-emerald-600">
-          <User size={32} />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-stone-150">
+        <div className="flex items-center gap-4">
+          <div className="bg-emerald-100 p-4 rounded-full text-emerald-600">
+            <User size={32} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-stone-900">{profile?.displayName || 'مستخدم'}</h1>
+            <p className="text-stone-500 text-sm">{user.email || user.phoneNumber}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">{profile?.displayName || 'مستخدم'}</h1>
-          <p className="text-stone-500 text-sm">{user.email}</p>
-        </div>
+        <button
+          onClick={() => setDeleteModalOpen(true)}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 font-medium rounded-xl transition-all duration-200 text-sm select-none"
+        >
+          <Trash2 size={16} />
+          <span>حذف الحساب والبيانات</span>
+        </button>
       </div>
 
       <section className="space-y-4">
@@ -400,6 +462,71 @@ export default function Profile() {
           </div>
         )}
       </section>
+
+      {/* Delete Account Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-stone-150 animate-in fade-in zoom-in-95 duration-200" style={{ direction: 'rtl' }}>
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <div className="bg-red-50 p-2.5 rounded-full text-red-600">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-lg font-bold">حذف الحساب والبيانات الشخصية</h3>
+            </div>
+            
+            <p className="text-stone-600 text-sm leading-relaxed mb-4">
+              هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ هذا الإجراء سيقوم بـ:
+            </p>
+            
+            <ul className="list-disc list-inside text-xs text-stone-500 space-y-2 mb-6 pr-2">
+              <li>حذف ملفك الشخصي بالكامل من قاعدة البيانات.</li>
+              <li>حذف جميع تذاكر السفر والحجوزات المرتبطة بحسابك نهائياً.</li>
+              <li>مسح معلومات جهازك المسجلة لنظام الإشعارات.</li>
+              <li>حذف بيانات الاعتمادات وتسجيل الدخول الخاص بك.</li>
+            </ul>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6 text-amber-800 text-xs flex gap-2">
+              <div className="text-amber-600 shrink-0 mt-0.5">
+                <ShieldAlert size={18} />
+              </div>
+              <span>
+                <strong className="block mb-0.5">تنبيه هام جداً:</strong>
+                هذا الإجراء نهائي ولا يمكن التراجع عنه أو استعادة التذاكر والحجوزات المحذوفة لاحقاً.
+              </span>
+            </div>
+
+            {deleteError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deletingProgress}
+                className="flex-1 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium rounded-xl transition-colors text-sm disabled:opacity-50 select-none"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleDeleteAccountCombined}
+                disabled={deletingProgress}
+                className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50 select-none"
+              >
+                {deletingProgress ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>جاري الحذف...</span>
+                  </>
+                ) : (
+                  <span>نعم، احذف نهائياً</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
