@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.aloujan.bus', // تأكد أن هذا يطابق ما وضعته في Firebase
+  appId: 'com.alujantravel.app', // تأكد أن هذا يطابق ما وضعته في Firebase
   appName: 'العوجان للسياحة والسفر', // تم تعديل الاسم هنا
   webDir: 'dist',
   server: {

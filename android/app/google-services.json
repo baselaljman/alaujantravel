@@ -10,7 +10,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:598775315117:android:06e82f6c40c67899ea6424",
         "android_client_info": {
-          "package_name": "com.aloujan.bus"
+          "package_name": "com.alujantravel.app"
         }
       },
       "oauth_client": [
@@ -18,7 +18,7 @@
           "client_id": "598775315117-fofik8tu6256n2nht1d5fd3gciopfjn8.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.aloujan.bus",
+            "package_name": "com.alujantravel.app",
             "certificate_hash": "dfae40ff0aed034a5e8d1e776aa167e7402d9b12"
           }
         }

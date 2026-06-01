@@ -1,4 +1,4 @@
-package com.aloujan.bus;
+package com.alujantravel.app;
 
 import com.getcapacitor.BridgeActivity;
 

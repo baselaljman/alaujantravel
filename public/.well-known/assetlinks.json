@@ -10,17 +10,5 @@
         "24:f3:5a:69:77:41:8f:65:16:09:13:4c:cd:7d:bf:1c:37:15:6a:d7:50:fc:4c:fd:1f:f9:85:99:c7:b5:dd:6a"
       ]
     }
-  },
-  {
-    "relation": [
-      "delegate_permission/common.handle_all_urls"
-    ],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.aloujan.bus",
-      "sha256_cert_fingerprints": [
-        "24:f3:5a:69:77:41:8f:65:16:09:13:4c:cd:7d:bf:1c:37:15:6a:d7:50:fc:4c:fd:1f:f9:85:99:c7:b5:dd:6a"
-      ]
-    }
   }
 ]

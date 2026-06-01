@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.aloujan.bus">
+    package="com.alujantravel.app">
 
     <!-- 1. صلاحيات الموقع الأساسية (أثناء استخدام التطبيق فقط) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

@@ -117,7 +117,7 @@ export async function registerDeviceToken(token: string, modelName?: string, use
       platform: 'android',
       model: model,
       lastSeen: Timestamp.now(),
-      appName: 'com.aloujan.bus',
+      appName: 'com.alujantravel.app',
       ...(uid ? { userId } : {}),
       ...(userEmail ? { userEmail } : {}),
       ...(userPhone ? { userPhone } : {}),
