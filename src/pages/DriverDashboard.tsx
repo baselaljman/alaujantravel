@@ -23,17 +23,10 @@ export default function DriverDashboard() {
   const lastLocalStatusUpdateRef = React.useRef<number>(0);
   const [showBatteryWarning, setShowBatteryWarning] = useState(false);
 
-  useEffect(() => {
-    activeTripRef.current = activeTrip;
-  }, [activeTrip]);
-
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
-
-  useEffect(() => {
-    isBroadcastingRef.current = isBroadcasting;
-  }, [isBroadcasting]);
+  // Sync refs synchronously during render to prevent race conditions in effects
+  activeTripRef.current = activeTrip;
+  userRef.current = user;
+  isBroadcastingRef.current = isBroadcasting;
 
   useEffect(() => {
     // Check if we are on Android to show battery warning
@@ -127,9 +120,39 @@ export default function DriverDashboard() {
 
   useEffect(() => {
     let watchId: any;
+    let intervalId: any;
+
+    const syncLocation = async (latitude: number, longitude: number, source: string) => {
+      const currentTrip = activeTripRef.current;
+      const currentUser = userRef.current;
+      const isBroadcastingNow = isBroadcastingRef.current;
+
+      if (currentTrip && currentUser && isBroadcastingNow) {
+        const now = Date.now();
+        // Force synchronous or periodic update every 15 seconds
+        if (now - lastSyncTimeRef.current >= 15000) {
+          const locationData: LiveLocation = {
+            driverId: currentUser.uid,
+            tripId: currentTrip.id,
+            lat: latitude,
+            lng: longitude,
+            lastUpdated: new Date().toISOString(),
+          };
+          
+          try {
+            await setDoc(doc(db, 'locations', currentTrip.id), locationData);
+            lastSyncTimeRef.current = now;
+            setLastSyncTime(new Date().toLocaleTimeString('ar-EG'));
+            console.log(`[${source}] ${new Date().toLocaleTimeString()}: ${latitude}, ${longitude}`);
+          } catch (err) {
+            console.error(`[${source}] Sync Error:`, err);
+          }
+        }
+      }
+    };
 
     const startTracking = async () => {
-      if (!isBroadcasting || !activeTripRef.current || !userRef.current) return;
+      if (!isBroadcasting) return;
 
       const isNative = (window as any).Capacitor?.isNativePlatform();
 
@@ -141,7 +164,6 @@ export default function DriverDashboard() {
             return;
           }
 
-          // Important: We only start the watcher once and use refs inside it
           if (!watcherIdRef.current) {
             console.log('Starting Capacitor Geolocation Watcher...');
             watcherIdRef.current = await Geolocation.watchPosition(
@@ -155,64 +177,52 @@ export default function DriverDashboard() {
                   console.error('Capacitor Geolocation Error:', error);
                   return;
                 }
-                
-                const currentTrip = activeTripRef.current;
-                const currentUser = userRef.current;
-                const isBroadcastingNow = isBroadcastingRef.current;
-
-                if (pos && currentTrip && currentUser && isBroadcastingNow) {
-                  const now = Date.now();
-                  // Force sync every 20 seconds
-                  if (now - lastSyncTimeRef.current >= 20000) {
-                    const locationData: LiveLocation = {
-                      driverId: currentUser.uid,
-                      tripId: currentTrip.id,
-                      lat: pos.coords.latitude,
-                      lng: pos.coords.longitude,
-                      lastUpdated: new Date().toISOString(),
-                    };
-                    
-                    try {
-                      if (isBroadcastingRef.current) {
-                        await setDoc(doc(db, 'locations', currentTrip.id), locationData);
-                        lastSyncTimeRef.current = now;
-                        setLastSyncTime(new Date().toLocaleTimeString('ar-EG'));
-                        console.log(`[GEO SYNC] ${new Date().toLocaleTimeString()}: ${pos.coords.latitude}, ${pos.coords.longitude}`);
-                      }
-                    } catch (err) {
-                      console.error('GPS Sync Error:', err);
-                    }
-                  }
+                if (pos) {
+                  await syncLocation(pos.coords.latitude, pos.coords.longitude, "NATIVE WATCH");
                 }
               }
             );
           }
+
+          // Native periodic fallback interval
+          intervalId = setInterval(async () => {
+            try {
+              const pos = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+              });
+              if (pos) {
+                await syncLocation(pos.coords.latitude, pos.coords.longitude, "NATIVE HEARTBEAT");
+              }
+            } catch (err) {
+              console.warn('Native interval error:', err);
+            }
+          }, 20000);
+
         } catch (err) {
           console.error('Failed to start Capacitor location tracking:', err);
         }
       } else {
+        // Web watchPosition (movement-based triggers)
         watchId = navigator.geolocation.watchPosition(
           async (pos) => {
-            const now = Date.now();
-            const currentTrip = activeTripRef.current;
-            const currentUser = userRef.current;
-            const isBroadcastingNow = isBroadcastingRef.current;
-
-            if (now - lastSyncTimeRef.current >= 20000 && currentTrip && currentUser && isBroadcastingNow) {
-              const locationData: LiveLocation = {
-                driverId: currentUser.uid,
-                tripId: currentTrip.id,
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-                lastUpdated: new Date().toISOString(),
-              };
-              await setDoc(doc(db, 'locations', currentTrip.id), locationData);
-              lastSyncTimeRef.current = now;
-            }
+            await syncLocation(pos.coords.latitude, pos.coords.longitude, "WEB WATCH");
           },
-          (err) => console.error('Geolocation error:', err),
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+          (err) => console.warn('Web watchPosition error:', err),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
+
+        // Web periodic fallback interval (guarantees continuous updates when stationary / asleep)
+        intervalId = setInterval(() => {
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              await syncLocation(pos.coords.latitude, pos.coords.longitude, "WEB HEARTBEAT");
+            },
+            (err) => console.warn('Web interval error:', err),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        }, 20000);
       }
     };
 
@@ -221,15 +231,18 @@ export default function DriverDashboard() {
     }
 
     return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-      // We don't necessarily want to remove the watcher on every re-render
-      // but we should clean up when broadcasting stops
-      if (!isBroadcasting && watcherIdRef.current) {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      if (watcherIdRef.current) {
         Geolocation.clearWatch({ id: watcherIdRef.current });
         watcherIdRef.current = null;
       }
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
-  }, [isBroadcasting, activeTrip?.id, user?.uid]); // Also depend on activeTrip to catch if it becomes available after broadcasting starts
+  }, [isBroadcasting]); // Depend only on isBroadcasting since refs update synchronously on every render and keep callback always fresh
 
   if (profile?.role !== 'driver') {
     return <div className="text-center py-20">عذراً، هذه الصفحة مخصصة للسائقين فقط.</div>;
