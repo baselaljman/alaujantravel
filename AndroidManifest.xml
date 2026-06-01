@@ -48,12 +48,7 @@
             </intent-filter>
         </activity>
 
-        <!-- 5. تعريف خدمة الخلفية (Background Service) -->
-        <service
-            android:name="com.equimaps.geolocation.BackgroundGeolocationService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="location" />
+
 
         <provider
             android:name="androidx.core.content.FileProvider"

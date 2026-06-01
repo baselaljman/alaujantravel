@@ -6,17 +6,7 @@ import { Trip, LiveLocation } from '../types';
 import { MapPin, Navigation, Power, PowerOff, Users, Play, Pause, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
-
-// Define the background geolocation plugin interface
-interface BackgroundGeolocationPlugin {
-  addWatcher(options: any, callback: (location: any, error: any) => void): Promise<string>;
-  removeWatcher(options: { id: string }): Promise<void>;
-  openSettings(): Promise<void>;
-}
-
-const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
 export default function DriverDashboard() {
   const { user, profile } = useAuth();
@@ -53,12 +43,8 @@ export default function DriverDashboard() {
     }
   }, [isBroadcasting]);
 
-  const openSettings = async () => {
-    try {
-      await BackgroundGeolocation.openSettings();
-    } catch (err) {
-      console.error('Could not open settings:', err);
-    }
+  const openSettings = () => {
+    alert('يرجى الانتقال إلى إعدادات الهاتف -> التطبيقات -> تطبيق العوجان للسياحة والسفر -> الصلاحيات -> الموقع -> حدد "السماح طوال الوقت" (Allow all the time) لضمان تتبع دائم في الخلفية.');
   };
 
   useEffect(() => {
@@ -140,7 +126,7 @@ export default function DriverDashboard() {
   };
 
   useEffect(() => {
-    let watchId: number;
+    let watchId: any;
 
     const startTracking = async () => {
       if (!isBroadcasting || !activeTripRef.current || !userRef.current) return;
@@ -157,22 +143,16 @@ export default function DriverDashboard() {
 
           // Important: We only start the watcher once and use refs inside it
           if (!watcherIdRef.current) {
-            console.log('Starting Background Watcher with aggressive settings...');
-            watcherIdRef.current = await BackgroundGeolocation.addWatcher(
+            console.log('Starting Capacitor Geolocation Watcher...');
+            watcherIdRef.current = await Geolocation.watchPosition(
               {
-                backgroundMessage: "يتم تتبع موقع الحافلة الآن لتزويد الركاب بالمعلومات. يرجى إبقاء التطبيق مفتوحاً في الخلفية.",
-                backgroundTitle: "تتبع الموقع نشط - العوجان للسياحة",
-                requestPermissions: true,
-                stale: false,
-                distanceFilter: 0, // Trigger on any movement
-                interval: 20000,    // 20s interval
-                fastestInterval: 10000,
-                priority: 100,     // PRIORITY_HIGH_ACCURACY
-                stopOnTerminate: false // Keep running even if app is swiped away
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
               },
-              async (location: any, error: any) => {
+              async (pos, error) => {
                 if (error) {
-                  console.error('BG Watcher Error:', error);
+                  console.error('Capacitor Geolocation Error:', error);
                   return;
                 }
                 
@@ -180,15 +160,15 @@ export default function DriverDashboard() {
                 const currentUser = userRef.current;
                 const isBroadcastingNow = isBroadcastingRef.current;
 
-                if (location && currentTrip && currentUser && isBroadcastingNow) {
+                if (pos && currentTrip && currentUser && isBroadcastingNow) {
                   const now = Date.now();
                   // Force sync every 20 seconds
                   if (now - lastSyncTimeRef.current >= 20000) {
                     const locationData: LiveLocation = {
                       driverId: currentUser.uid,
                       tripId: currentTrip.id,
-                      lat: location.latitude,
-                      lng: location.longitude,
+                      lat: pos.coords.latitude,
+                      lng: pos.coords.longitude,
                       lastUpdated: new Date().toISOString(),
                     };
                     
@@ -197,10 +177,10 @@ export default function DriverDashboard() {
                         await setDoc(doc(db, 'locations', currentTrip.id), locationData);
                         lastSyncTimeRef.current = now;
                         setLastSyncTime(new Date().toLocaleTimeString('ar-EG'));
-                        console.log(`[BG SYNC] ${new Date().toLocaleTimeString()}: ${location.latitude}, ${location.longitude}`);
+                        console.log(`[GEO SYNC] ${new Date().toLocaleTimeString()}: ${pos.coords.latitude}, ${pos.coords.longitude}`);
                       }
                     } catch (err) {
-                      console.error('BG Sync Error:', err);
+                      console.error('GPS Sync Error:', err);
                     }
                   }
                 }
@@ -208,7 +188,7 @@ export default function DriverDashboard() {
             );
           }
         } catch (err) {
-          console.error('Failed to start background tracking:', err);
+          console.error('Failed to start Capacitor location tracking:', err);
         }
       } else {
         watchId = navigator.geolocation.watchPosition(
@@ -245,7 +225,7 @@ export default function DriverDashboard() {
       // We don't necessarily want to remove the watcher on every re-render
       // but we should clean up when broadcasting stops
       if (!isBroadcasting && watcherIdRef.current) {
-        BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current });
+        Geolocation.clearWatch({ id: watcherIdRef.current });
         watcherIdRef.current = null;
       }
     };
