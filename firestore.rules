@@ -19,11 +19,28 @@ service cloud.firestore {
 
     function isVerified() {
       return isSignedIn() && (
-        request.auth.token.email_verified == true || 
-        request.auth.token.firebase.sign_in_provider == 'phone' ||
+        request.auth.token.get('email_verified', false) == true || 
+        request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'phone' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'driver', 'staff']
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'driver', 'staff']
         ))
+      );
+    }
+
+    // Custom helper to get string email or empty string safely
+    function userEmail() {
+      return isSignedIn() ? request.auth.token.get('email', '') : '';
+    }
+
+    // Custom helper to get string phone or empty string safely
+    function userPhone() {
+      return isSignedIn() ? request.auth.token.get('phone_number', '') : '';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"]) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
       );
     }
 
@@ -31,25 +48,10 @@ service cloud.firestore {
       return isSignedIn() && isValidId(userId) && request.auth.uid == userId;
     }
 
-    function userEmail() {
-      return isSignedIn() && 'email' in request.auth.token ? request.auth.token.email : null;
-    }
-
-    function userPhone() {
-      return isSignedIn() && 'phone_number' in request.auth.token ? request.auth.token.phone_number : null;
-    }
-
-    function isAdmin() {
-      return isVerified() && (
-        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"]) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
-    }
-
     function hasRole(role) {
       return isSignedIn() && (
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role)
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == role)
       );
     }
 
@@ -234,8 +236,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn() && (
         isAdmin() || 
-        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"]) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        hasRole('admin') ||
+        hasRole('staff') ||
+        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"]) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'staff'])
       );
     }
 

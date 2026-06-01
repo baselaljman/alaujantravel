@@ -11,7 +11,7 @@ import {
   Plus, Trash2, Edit, Bus as BusIcon, Users, Package, 
   Calendar, Shield, UserCheck, Settings, LayoutDashboard,
   CreditCard, MapPin, Clock, AlertCircle, X, Printer, Download, Search,
-  Image as ImageIcon, DollarSign, Bell, Send, Smartphone
+  Image as ImageIcon, DollarSign, Bell, Send, Smartphone, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AdminCities from './AdminCities';
@@ -34,6 +34,7 @@ export default function AdminDashboard() {
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ coll: string, id: string, label: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [gatewayUrl, setGatewayUrl] = useState<string>('');
   const [isSavingGateway, setIsSavingGateway] = useState<boolean>(false);
@@ -1421,6 +1422,23 @@ export default function AdminDashboard() {
             </motion.div>
           )}
 
+          {success && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-2xl flex items-center justify-between mb-6"
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={20} className="text-emerald-600" />
+                <span className="text-sm font-bold">{success}</span>
+              </div>
+              <button onClick={() => setSuccess(null)} className="text-emerald-500 hover:text-emerald-700">
+                <X size={20} />
+              </button>
+            </motion.div>
+          )}
+
           {/* Confirmation Modal */}
           {deleteConfirm && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -1568,9 +1586,11 @@ export default function AdminDashboard() {
                     onClick={async () => {
                       try {
                         setIsSavingGateway(true);
+                        setError(null);
+                        setSuccess(null);
                         await setDoc(doc(db, 'settings', 'global'), { notificationGatewayUrl: gatewayUrl }, { merge: true });
-                        setError('تم حفظ معرّف رابط بوابة الإشعارات بنجاح!');
-                        setTimeout(() => setError(null), 5000);
+                        setSuccess('تم حفظ رابط معرّف بوابة الإشعارات بنجاح!');
+                        setTimeout(() => setSuccess(null), 7000);
                       } catch (err: any) {
                         setError(`فشل حفظ المعرّف: ${err.message}`);
                       } finally {
