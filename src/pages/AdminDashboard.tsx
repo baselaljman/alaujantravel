@@ -33,6 +33,7 @@ export default function AdminDashboard() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ coll: string, id: string, label: string } | null>(null);
+  const [editingBus, setEditingBus] = useState<Bus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1466,6 +1467,138 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* Edit Bus Modal */}
+          {editingBus && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl text-right space-y-4"
+              >
+                <div className="flex justify-between items-center pb-3 border-b border-stone-100">
+                  <h3 className="text-lg font-bold text-emerald-600">تعديل بيانات الحافلة</h3>
+                  <button 
+                    onClick={() => setEditingBus(null)}
+                    className="p-1 hover:bg-stone-100 rounded-full text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                
+                <div className="space-y-4 text-right">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">رقم اللوحة</label>
+                    <input 
+                      type="text" 
+                      value={editingBus.plateNumber} 
+                      onChange={e => setEditingBus({...editingBus, plateNumber: e.target.value})} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right" 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">رقم الحافلة الداخلي</label>
+                    <input 
+                      type="text" 
+                      value={editingBus.busNumber} 
+                      onChange={e => setEditingBus({...editingBus, busNumber: e.target.value})} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right" 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">الموديل</label>
+                    <input 
+                      type="text" 
+                      value={editingBus.model} 
+                      onChange={e => setEditingBus({...editingBus, model: e.target.value})} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right" 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">السعة</label>
+                    <input 
+                      type="number" 
+                      value={editingBus.capacity} 
+                      onChange={e => setEditingBus({...editingBus, capacity: Number(e.target.value)})} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right" 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">نوع الحافلة</label>
+                    <select 
+                      value={editingBus.type} 
+                      onChange={e => setEditingBus({...editingBus, type: e.target.value as any})} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right animate-none"
+                    >
+                      <option value="Standard font-sans">عادية</option>
+                      <option value="VIP font-sans">VIP</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1">السائق</label>
+                    <select 
+                      value={editingBus.driverId || ''} 
+                      onChange={e => setEditingBus({...editingBus, driverId: e.target.value})} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right animate-none font-sans"
+                    >
+                      <option value="">لا يوجد سائق</option>
+                      {drivers.map(d => <option key={d.uid} value={d.uid}>{d.displayName}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-500 mb-1 font-sans">الحالة</label>
+                    <select 
+                      value={editingBus.status} 
+                      onChange={e => setEditingBus({...editingBus, status: e.target.value as any})} 
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-right animate-none font-sans"
+                    >
+                      <option value="active">نشطة</option>
+                      <option value="maintenance">صيانة</option>
+                      <option value="inactive">متوقفة</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 pt-3 border-t border-stone-100">
+                  <button 
+                    onClick={async () => {
+                      if (!editingBus || !editingBus.plateNumber || !editingBus.busNumber) return;
+                      try {
+                        await updateDoc(doc(db, 'buses', editingBus.id), {
+                          plateNumber: editingBus.plateNumber,
+                          busNumber: editingBus.busNumber,
+                          model: editingBus.model,
+                          capacity: Number(editingBus.capacity),
+                          type: editingBus.type,
+                          status: editingBus.status,
+                          driverId: editingBus.driverId || ''
+                        });
+                        setEditingBus(null);
+                        setSuccess('تم تحديث بيانات الحافلة بنجاح');
+                      } catch (err) {
+                        handleFirestoreError(err, OperationType.UPDATE, `buses/${editingBus.id}`);
+                      }
+                    }} 
+                    className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors"
+                  >
+                    حفظ التعديلات
+                  </button>
+                  <button 
+                    onClick={() => setEditingBus(null)} 
+                    className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
           {/* Direct Notification Modal */}
           {directNotificationBooking && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -2120,9 +2253,14 @@ export default function AdminDashboard() {
                         <div className="bg-stone-100 p-3 rounded-2xl group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                           <BusIcon size={24} />
                         </div>
-                        <button onClick={() => handleDeleteRequest('buses', bus.id, `الحافلة ${bus.busNumber}`)} className="text-stone-300 hover:text-red-500 transition-colors">
-                          <Trash2 size={18} />
-                        </button>
+                        <div className="flex gap-2">
+                          <button onClick={() => setEditingBus(bus)} className="text-stone-300 hover:text-emerald-600 transition-colors" title="تعديل">
+                            <Edit size={18} />
+                          </button>
+                          <button onClick={() => handleDeleteRequest('buses', bus.id, `الحافلة ${bus.busNumber}`)} className="text-stone-300 hover:text-red-500 transition-colors" title="حذف">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
                       </div>
                       <h4 className="font-bold text-lg">{bus.busNumber}</h4>
                       <p className="text-xs text-stone-400 mb-2">{bus.plateNumber} • {bus.model}</p>
