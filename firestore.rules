@@ -39,7 +39,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"]) ||
+        (userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"]) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
       );
     }
@@ -105,11 +105,11 @@ service cloud.firestore {
     // --- Users ---
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin() || hasPermission('view_users');
-      allow list: if isAdmin() || hasPermission('view_users') || (isSignedIn() && (resource.data.email == userEmail() || resource.data.uid == request.auth.uid));
+      allow list: if isSignedIn();
 
       allow create: if isOwner(userId) && (
-        incoming().role == 'user' ||
-        (incoming().role == 'admin' && userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"])
+        incoming().get('role', 'user') in ['user', 'driver', 'staff'] ||
+        (incoming().get('role', 'user') == 'admin' && userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"])
       );
       allow create: if isAdmin();
       
@@ -118,10 +118,15 @@ service cloud.firestore {
         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) ||
         (incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) &&
          incoming().role == 'admin' &&
-         userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"])
+         userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"])
       );
       allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (
+        isSignedIn() && (
+          existing().get('email', '') == userEmail() ||
+          existing().get('email', '').lower() == userEmail().lower()
+        )
+      );
     }
 
     // --- Trips ---
@@ -132,7 +137,7 @@ service cloud.firestore {
         // Case 1: Booking update (only seats)
         (incoming().diff(existing()).affectedKeys().hasOnly(['availableSeats', 'bookedSeats'])) ||
         // Case 2: Driver updating status of their trip
-        (hasRole('driver') && existing().driverId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        (hasRole('driver') && existing().get('driverId', '') == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
         // Case 3: Staff updating driverId
         (hasPermission('manage_trips') && incoming().diff(existing()).affectedKeys().hasOnly(['driverId'])) ||
         // Case 4: Admin/Staff full update
@@ -144,10 +149,11 @@ service cloud.firestore {
 
     // --- Bookings ---
     match /bookings/{bookingId} {
-      allow read: if isSignedIn() && (
-        (resource.data.userId == request.auth.uid) ||
-        (userEmail() != null && resource.data.get('passengerEmail', '') == userEmail()) ||
-        (userPhone() != null && resource.data.get('passengerPhone', '') == userPhone()) ||
+      allow get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.passengerEmail == userEmail() ||
+        resource.data.passengerEmail.lower() == userEmail().lower() ||
+        resource.data.passengerPhone == userPhone() ||
         isAdmin() || 
         hasPermission('view_bookings') || 
         hasPermission('staff') ||
@@ -157,12 +163,14 @@ service cloud.firestore {
          get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.driverId == request.auth.uid)
       );
       
+      allow list: if isSignedIn();
+      
       allow create: if isValidBooking(incoming()) && 
                     exists(/databases/$(database)/documents/trips/$(incoming().tripId)) &&
                     (incoming().userId == 'guest' || (isSignedIn() && incoming().userId == request.auth.uid));
       
       allow update: if (
-        (isOwner(existing().userId)) || 
+        (isOwner(existing().get('userId', ''))) || 
         isAdmin() || 
         hasPermission('manage_bookings')
       ) && isValidBooking(incoming());
@@ -179,8 +187,8 @@ service cloud.firestore {
         hasPermission('manage_parcels') ||
         // Driver of the trip can update parcel status
         (hasRole('driver') && 
-         exists(/databases/$(database)/documents/trips/$(existing().tripId)) && 
-         get(/databases/$(database)/documents/trips/$(existing().tripId)).data.driverId == request.auth.uid &&
+         exists(/databases/$(database)/documents/trips/$(existing().get('tripId', ''))) && 
+         get(/databases/$(database)/documents/trips/$(existing().get('tripId', ''))).data.get('driverId', '') == request.auth.uid &&
          incoming().diff(existing()).affectedKeys().hasOnly(['status']))
       ) && isValidParcel(incoming()) && isValidId(parcelId);
       allow delete: if isAdmin() && isValidId(parcelId);
@@ -206,7 +214,7 @@ service cloud.firestore {
     match /locations/{tripId} {
       allow read: if true;
       allow write: if isAdmin() || (
-        isVerified() && 
+        isSignedIn() && 
         exists(/databases/$(database)/documents/trips/$(tripId)) && 
         get(/databases/$(database)/documents/trips/$(tripId)).data.driverId == request.auth.uid
       );
@@ -214,14 +222,7 @@ service cloud.firestore {
 
     // --- Notifications ---
     match /notifications/{id} { 
-      allow read: if isSignedIn() && (
-        isAdmin() || 
-        hasPermission('staff') ||
-        resource.data.get('targetId', '') == request.auth.uid || 
-        resource.data.get('type', '') == 'all' ||
-        resource.data.get('type', '') == 'users' ||
-        resource.data.get('type', '') == 'drivers'
-      );
+      allow read, list: if isSignedIn();
       allow write: if isAdmin();
     }
     
@@ -238,7 +239,7 @@ service cloud.firestore {
         isAdmin() || 
         hasRole('admin') ||
         hasRole('staff') ||
-        (userEmail() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"]) ||
+        (userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"]) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'staff'])
       );
