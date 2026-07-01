@@ -3278,10 +3278,14 @@ function PermissionToggle({ user, permission, label }: { user: UserProfile, perm
   const hasPermission = user.permissions?.includes(permission);
   
   const toggle = async () => {
-    const newPermissions = hasPermission 
-      ? user.permissions?.filter(p => p !== permission) 
-      : [...(user.permissions || []), permission];
-    await updateDoc(doc(db, 'users', user.uid), { permissions: newPermissions });
+    try {
+      const newPermissions = hasPermission 
+        ? user.permissions?.filter(p => p !== permission) 
+        : [...(user.permissions || []), permission];
+      await updateDoc(doc(db, 'users', user.uid), { permissions: newPermissions });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    }
   };
 
   return (

@@ -104,14 +104,14 @@ service cloud.firestore {
 
     // --- Users ---
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin() || hasPermission('view_users');
+      allow get: if isOwner(userId) || isAdmin() || hasPermission('view_users') || hasPermission('manage_users');
       allow list: if isSignedIn();
 
       allow create: if isOwner(userId) && (
         incoming().get('role', 'user') in ['user', 'driver', 'staff'] ||
         (incoming().get('role', 'user') == 'admin' && userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"])
       );
-      allow create: if isAdmin();
+      allow create: if isAdmin() || hasPermission('manage_users');
       
       allow update: if isOwner(userId) && (
         // Users can't change their own role or permissions unless they are in the allowed admin list
@@ -120,8 +120,8 @@ service cloud.firestore {
          incoming().role == 'admin' &&
          userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"])
       );
-      allow update: if isAdmin();
-      allow delete: if isAdmin() || (
+      allow update: if isAdmin() || hasPermission('manage_users');
+      allow delete: if isAdmin() || hasPermission('manage_users') || (
         isSignedIn() && (
           existing().get('email', '') == userEmail() ||
           existing().get('email', '').lower() == userEmail().lower()
@@ -156,6 +156,7 @@ service cloud.firestore {
         resource.data.passengerPhone == userPhone() ||
         isAdmin() || 
         hasPermission('view_bookings') || 
+        hasPermission('manage_bookings') ||
         hasPermission('staff') ||
         hasRole('driver') ||
         // Driver of the trip can see bookings
@@ -195,19 +196,19 @@ service cloud.firestore {
     }
 
     // --- Cities & Countries ---
-    match /cities/{id} { allow read: if true; allow write: if isAdmin() || hasPermission('manage_trips'); }
-    match /countries/{id} { allow read: if true; allow write: if isAdmin() || hasPermission('manage_trips'); }
+    match /cities/{id} { allow read: if true; allow write: if isAdmin() || hasPermission('manage_cities') || hasPermission('manage_trips'); }
+    match /countries/{id} { allow read: if true; allow write: if isAdmin() || hasPermission('manage_cities') || hasPermission('manage_trips'); }
     
     // --- Buses ---
     match /buses/{id} { 
       allow read: if isSignedIn(); 
-      allow write: if isAdmin() || hasPermission('manage_trips'); 
+      allow write: if isAdmin() || hasPermission('manage_buses') || hasPermission('manage_trips'); 
     }
 
     // --- Banners ---
     match /banners/{id} { 
       allow read: if true; 
-      allow write: if isAdmin(); 
+      allow write: if isAdmin() || hasPermission('manage_banners'); 
     }
     
     // --- Locations (Live Tracking) ---
