@@ -17,85 +17,98 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isVerified() {
       return isSignedIn() && (
-        request.auth.token.get('email_verified', false) == true || 
-        request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'phone' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'driver', 'staff']
+        ('email_verified' in request.auth.token && request.auth.token.email_verified == true) || 
+        ('firebase' in request.auth.token && 'sign_in_provider' in request.auth.token.firebase && request.auth.token.firebase.sign_in_provider == 'phone') ||
+        (hasUserDoc() && (
+          getUserDoc().get('role', 'user') in ['admin', 'driver', 'staff']
         ))
       );
     }
 
     // Custom helper to get string email or empty string safely
     function userEmail() {
-      return isSignedIn() ? request.auth.token.get('email', '') : '';
+      return (isSignedIn() && 'email' in request.auth.token) ? request.auth.token.email : '';
     }
 
     // Custom helper to get string phone or empty string safely
     function userPhone() {
-      return isSignedIn() ? request.auth.token.get('phone_number', '') : '';
+      return (isSignedIn() && 'phone_number' in request.auth.token) ? request.auth.token.phone_number : '';
     }
 
     function isAdmin() {
       return isSignedIn() && (
         (userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"]) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
+        (hasUserDoc() && getUserDoc().get('role', 'user') == 'admin')
       );
     }
 
     function isOwner(userId) {
-      return isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function hasRole(role) {
       return isSignedIn() && (
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == role)
+        (role == 'admin' && isAdmin()) ||
+        (hasUserDoc() && getUserDoc().get('role', 'user') == role)
       );
     }
 
     function hasPermission(p) {
       return isSignedIn() && (
         isAdmin() || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('permissions', []).hasAny([p]))
+        (hasUserDoc() && (
+          getUserDoc().get('role', 'user') == 'staff' && 
+          p in getUserDoc().get('permissions', [])
+        ))
       );
     }
 
+    // Safe getters for resource data
     function incoming() {
       return request.resource.data;
     }
 
+    // Safe getters for existing resource data
     function existing() {
       return resource.data;
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() <= 128;
     }
 
     // --- Entity Validations ---
 
     function isValidTrip(data) {
-      return data.from is string && data.from.size() <= 100 &&
-             data.to is string && data.to.size() <= 100 &&
-             data.date is string && data.date.size() <= 20 &&
-             data.status in ['scheduled', 'active', 'paused', 'completed', 'cancelled'];
+      return data.get('from', '') is string && data.get('from', '').size() <= 100 &&
+             data.get('to', '') is string && data.get('to', '').size() <= 100 &&
+             data.get('date', '') is string && data.get('date', '').size() <= 20 &&
+             data.get('status', 'scheduled') in ['scheduled', 'active', 'paused', 'completed', 'cancelled'];
     }
 
     function isValidBooking(data) {
-      return data.tripId is string && isValidId(data.tripId) &&
-             data.passengerName is string && data.passengerName.size() <= 128 &&
-             data.passengerPhone is string && data.passengerPhone.size() <= 20 &&
-             (data.seatNumber is int || data.seatNumber is float) && data.seatNumber >= 1 && data.seatNumber <= 100;
+      return data.get('tripId', '') is string && isValidId(data.get('tripId', '')) &&
+             data.get('passengerName', '') is string && data.get('passengerName', '').size() <= 128 &&
+             data.get('passengerPhone', '') is string && data.get('passengerPhone', '').size() <= 20 &&
+             (data.get('seatNumber', 0) is int || data.get('seatNumber', 0) is float) && data.get('seatNumber', 0) >= 1 && data.get('seatNumber', 0) <= 100;
     }
 
+    // Safe validation of parcels
     function isValidParcel(data) {
-      return data.senderName is string && data.senderName.size() <= 128 &&
-             data.receiverName is string && data.receiverName.size() <= 128 &&
-             data.tripId is string && isValidId(data.tripId) &&
-             data.status in ['pending', 'shipped', 'delivered'];
+      return data.get('senderName', '') is string && data.get('senderName', '').size() <= 128 &&
+             data.get('receiverName', '') is string && data.get('receiverName', '').size() <= 128 &&
+             data.get('tripId', '') is string && isValidId(data.get('tripId', '')) &&
+             data.get('status', 'pending') in ['pending', 'shipped', 'delivered'];
     }
 
     // -----------------------------------------------------------------
@@ -117,11 +130,11 @@ service cloud.firestore {
         // Users can't change their own role or permissions unless they are in the allowed admin list
         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) ||
         (incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'phoneNumber', 'fcmToken', 'deviceType', 'photoURL']) &&
-         incoming().role == 'admin' &&
+         incoming().get('role', 'user') == 'admin' &&
          userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"])
       );
       allow update: if isAdmin() || hasPermission('manage_users');
-      allow delete: if isAdmin() || hasPermission('manage_users') || (
+      allow delete: if isAdmin() || hasPermission('manage_users') || isOwner(userId) || (
         isSignedIn() && (
           existing().get('email', '') == userEmail() ||
           existing().get('email', '').lower() == userEmail().lower()
@@ -144,39 +157,41 @@ service cloud.firestore {
         isAdmin() || 
         hasPermission('manage_trips')
       ) && isValidTrip(incoming()) && isValidId(tripId);
-      allow delete: if isAdmin() && isValidId(tripId);
+      allow delete: if (isAdmin() || hasPermission('manage_trips')) && isValidId(tripId);
     }
 
     // --- Bookings ---
     match /bookings/{bookingId} {
       allow get: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        resource.data.passengerEmail == userEmail() ||
-        resource.data.passengerEmail.lower() == userEmail().lower() ||
-        resource.data.passengerPhone == userPhone() ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('passengerEmail', '') == userEmail() ||
+        resource.data.get('passengerEmail', '').lower() == userEmail().lower() ||
+        resource.data.get('passengerPhone', '') == userPhone() ||
         isAdmin() || 
         hasPermission('view_bookings') || 
         hasPermission('manage_bookings') ||
-        hasPermission('staff') ||
+        hasRole('staff') ||
         hasRole('driver') ||
         // Driver of the trip can see bookings
-        (exists(/databases/$(database)/documents/trips/$(resource.data.tripId)) && 
-         get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.driverId == request.auth.uid)
+        (exists(/databases/$(database)/documents/trips/$(resource.data.get('tripId', ''))) && 
+         get(/databases/$(database)/documents/trips/$(resource.data.get('tripId', ''))).data.get('driverId', '') == request.auth.uid)
       );
       
       allow list: if isSignedIn();
       
-      allow create: if isValidBooking(incoming()) && 
-                    exists(/databases/$(database)/documents/trips/$(incoming().tripId)) &&
-                    (incoming().userId == 'guest' || (isSignedIn() && incoming().userId == request.auth.uid));
+      allow create: if (
+                      isValidBooking(incoming()) && 
+                      exists(/databases/$(database)/documents/trips/$(incoming().get('tripId', ''))) &&
+                      (incoming().get('userId', '') == 'guest' || (isSignedIn() && incoming().get('userId', '') == request.auth.uid))
+                    ) || isAdmin() || hasPermission('manage_bookings');
       
       allow update: if (
-        (isOwner(existing().get('userId', ''))) || 
+        (isSignedIn() && existing().get('userId', '') == request.auth.uid) || 
         isAdmin() || 
         hasPermission('manage_bookings')
       ) && isValidBooking(incoming());
       
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || hasPermission('manage_bookings') || (isSignedIn() && existing().get('userId', '') == request.auth.uid);
     }
 
     // --- Parcels ---
@@ -192,7 +207,7 @@ service cloud.firestore {
          get(/databases/$(database)/documents/trips/$(existing().get('tripId', ''))).data.get('driverId', '') == request.auth.uid &&
          incoming().diff(existing()).affectedKeys().hasOnly(['status']))
       ) && isValidParcel(incoming()) && isValidId(parcelId);
-      allow delete: if isAdmin() && isValidId(parcelId);
+      allow delete: if (isAdmin() || hasPermission('manage_parcels')) && isValidId(parcelId);
     }
 
     // --- Cities & Countries ---
@@ -217,20 +232,20 @@ service cloud.firestore {
       allow write: if isAdmin() || (
         isSignedIn() && 
         exists(/databases/$(database)/documents/trips/$(tripId)) && 
-        get(/databases/$(database)/documents/trips/$(tripId)).data.driverId == request.auth.uid
+        get(/databases/$(database)/documents/trips/$(tripId)).data.get('driverId', '') == request.auth.uid
       );
     }
 
     // --- Notifications ---
     match /notifications/{id} { 
-      allow read, list: if isSignedIn();
-      allow write: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || hasRole('staff');
     }
     
     // --- Metadata ---
     match /metadata/{id} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || hasPermission('manage_trips') || hasPermission('manage_parcels');
     }
 
     // --- Settings ---
@@ -241,20 +256,25 @@ service cloud.firestore {
         hasRole('admin') ||
         hasRole('staff') ||
         (userEmail().lower() in ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"]) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'staff'])
+        (hasUserDoc() && getUserDoc().get('role', 'user') in ['admin', 'staff'])
       );
     }
 
     // --- Devices (Push Notifications) ---
     match /devices/{deviceId} {
       allow read, create, update: if true;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && existing().get('userId', '') == request.auth.uid);
     }
 
     // --- SMS OTPs ---
     match /sms_otps/{id} {
       allow read, write: if false;
+    }
+
+    // --- Delete Requests (GDPR / Google Play Compliance) ---
+    match /delete_requests/{id} {
+      allow create: if true;
+      allow read, write: if isAdmin() || hasPermission('manage_users');
     }
   }
 }

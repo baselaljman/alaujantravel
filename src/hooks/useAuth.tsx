@@ -269,7 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
           if (docSnap.exists()) {
             const existingProfile = docSnap.data() as UserProfile;
-            const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"];
+            const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"];
             
             // Force admin role if email matches and not already admin
             if (user.email && adminEmails.includes(user.email.toLowerCase()) && existingProfile.role !== 'admin') {
@@ -285,8 +285,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             let querySnapshot: any = { empty: true };
             
             if (userEmail) {
-              const q = query(collection(db, 'users'), where('email', '==', userEmail));
-              querySnapshot = await getDocs(q);
+              const q1 = query(collection(db, 'users'), where('email', '==', userEmail));
+              querySnapshot = await getDocs(q1);
+              
+              if (querySnapshot.empty && user.email && user.email !== userEmail) {
+                const q2 = query(collection(db, 'users'), where('email', '==', user.email));
+                querySnapshot = await getDocs(q2);
+              }
             }
             
             if (!querySnapshot.empty) {
@@ -305,7 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
               setProfile(newProfile);
             } else {
-              const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com"];
+              const adminEmails = ["baselaljman@gmail.com", "maan500094210@gmail.com", "maan1@gmail.com", "a0537136212@icloud.com", "maan500069261@gmail.com"];
               const role = (user.email && adminEmails.includes(user.email.toLowerCase())) ? 'admin' : 'user';
               const newProfile: UserProfile = {
                 uid: user.uid,

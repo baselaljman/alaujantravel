@@ -66,14 +66,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     const q = query(
       collection(db, 'notifications'),
-      or(...constraints),
-      orderBy('sentAt', 'desc'),
-      limit(1)
+      or(...constraints)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) return;
-      const notif = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+      
+      const notificationsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      // Sort on the client side to avoid requiring composite indexes
+      notificationsData.sort((a, b) => {
+        const dateA = a.sentAt ? new Date(a.sentAt).getTime() : 0;
+        const dateB = b.sentAt ? new Date(b.sentAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      const notif = notificationsData[0];
       
       // Check if notification is for this user and delivery method
       const isForMe = 

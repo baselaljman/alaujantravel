@@ -23,12 +23,13 @@ export default function Home() {
   useEffect(() => {
     const bannersQuery = query(
       collection(db, 'banners'),
-      where('active', '==', true),
-      orderBy('order', 'asc')
+      where('active', '==', true)
     );
 
     const unsubscribe = onSnapshot(bannersQuery, (snapshot) => {
       const bannersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Banner));
+      // Sort on the client side to avoid requiring composite indexes
+      bannersData.sort((a, b) => (a.order || 0) - (b.order || 0));
       setBanners(bannersData);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'banners');
