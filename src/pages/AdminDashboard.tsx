@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, 
-  query, where, runTransaction, getDocs, setDoc
+  query, where, runTransaction, getDocs, setDoc, getDoc
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Trip, UserProfile, Booking, Bus, City, Banner, Parcel, Notification, TripStop, Device } from '../types';
@@ -135,6 +135,34 @@ export default function AdminDashboard() {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showAddBookingForm, setShowAddBookingForm] = useState(false);
+  const [adminBookingCountryCode, setAdminBookingCountryCode] = useState('+966');
+  const [adminBookingData, setAdminBookingData] = useState({
+    passengerName: '',
+    passengerPhone: '',
+    passportNumber: '',
+    seatNumber: 0,
+    paymentMethod: 'later',
+    status: 'confirmed',
+    to: ''
+  });
+
+  useEffect(() => {
+    if (selectedTripId) {
+      const trip = trips.find(t => t.id === selectedTripId);
+      if (trip) {
+        setAdminBookingData(prev => ({
+          ...prev,
+          to: trip.to
+        }));
+      }
+    } else {
+      setAdminBookingData(prev => ({
+        ...prev,
+        to: ''
+      }));
+    }
+  }, [selectedTripId, trips]);
 
   const formatDateArabic = (dateStr: string) => {
     if (!dateStr) return '';
@@ -1352,6 +1380,88 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAddAdminBooking = async () => {
+    if (!selectedTripId) return;
+    const trip = trips.find(t => t.id === selectedTripId);
+    if (!trip) return;
+
+    const { passengerName, passengerPhone, passportNumber, seatNumber, paymentMethod, status, to } = adminBookingData;
+
+    if (!passengerName.trim()) {
+      setError('يرجى إدخال اسم المسافر');
+      return;
+    }
+    if (!passengerPhone.trim()) {
+      setError('يرجى إدخال رقم هاتف المسافر');
+      return;
+    }
+    if (!seatNumber) {
+      setError('يرجى اختيار رقم المقعد');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Double check seat is still available in Firestore
+      const tripRef = doc(db, 'trips', trip.id);
+      const tripSnap = await getDoc(tripRef);
+      if (!tripSnap.exists()) {
+        throw new Error('الرحلة غير موجودة');
+      }
+
+      const latestTripData = tripSnap.data();
+      const latestBookedSeats = latestTripData.bookedSeats || [];
+      if (latestBookedSeats.includes(seatNumber)) {
+        throw new Error(`المقعد رقم ${seatNumber} تم حجزه مسبقاً، يرجى اختيار مقعد آخر.`);
+      }
+
+      // 2. Add booking document
+      const fullPhoneNumber = `${adminBookingCountryCode}${passengerPhone.replace(/^0+/, '')}`;
+      const bookingData = {
+        tripId: trip.id,
+        from: trip.from,
+        to: to || trip.to,
+        seatNumber: Number(seatNumber),
+        status: status || 'confirmed',
+        paymentMethod: paymentMethod || 'later',
+        bookingDate: new Date().toISOString(),
+        userId: 'guest',
+        passengerName: passengerName.trim(),
+        passengerPhone: fullPhoneNumber,
+        passengerEmail: '',
+        passportNumber: passportNumber.trim(),
+      };
+
+      await addDoc(collection(db, 'bookings'), bookingData);
+
+      // 3. Update trip bookedSeats & availableSeats
+      const updatedBookedSeats = [...latestBookedSeats, Number(seatNumber)];
+      await updateDoc(tripRef, {
+        bookedSeats: updatedBookedSeats,
+        availableSeats: Math.max(0, (latestTripData.availableSeats || trip.totalSeats || 35) - 1)
+      });
+
+      setSuccess('تم إضافة الحجز بنجاح');
+      setShowAddBookingForm(false);
+      setAdminBookingData({
+        passengerName: '',
+        passengerPhone: '',
+        passportNumber: '',
+        seatNumber: 0,
+        paymentMethod: 'later',
+        status: 'confirmed',
+        to: trip.to
+      });
+    } catch (err: any) {
+      console.error('Error adding admin booking:', err);
+      setError(err.message || 'حدث خطأ أثناء إضافة الحجز');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const canSeeTab = (tab: AdminTab) => {
     if (profile?.role === 'admin') return true;
     if (profile?.role !== 'staff') return false;
@@ -2375,6 +2485,13 @@ export default function AdminDashboard() {
                     <h3 className="font-bold text-emerald-600">قائمة الحجوزات</h3>
                     <div className="flex gap-2">
                       <button 
+                        onClick={() => setShowAddBookingForm(!showAddBookingForm)}
+                        className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm transition-colors font-bold shadow-sm"
+                      >
+                        <Plus size={16} />
+                        إضافة حجز يدوي
+                      </button>
+                      <button 
                         onClick={handlePrintPassengerList}
                         className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2 rounded-xl text-sm transition-colors"
                       >
@@ -2390,6 +2507,193 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                   </div>
+
+                  {showAddBookingForm && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="card bg-white border border-stone-200 p-6 rounded-3xl space-y-4"
+                    >
+                      <div className="flex justify-between items-center pb-2 border-b">
+                        <h4 className="font-bold text-emerald-600">إضافة حجز يدوي جديد (بدون الحاجة للتحقق)</h4>
+                        <button 
+                          onClick={() => setShowAddBookingForm(false)}
+                          className="text-stone-400 hover:text-stone-600"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 font-sans text-right" dir="rtl">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-500">اسم المسافر *</label>
+                          <input 
+                            type="text" 
+                            placeholder="الاسم الثلاثي للمسافر"
+                            value={adminBookingData.passengerName}
+                            onChange={e => setAdminBookingData({...adminBookingData, passengerName: e.target.value})}
+                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-500">رقم الهاتف *</label>
+                          <div className="flex gap-2">
+                            <select
+                              value={adminBookingCountryCode}
+                              onChange={e => setAdminBookingCountryCode(e.target.value)}
+                              className="bg-stone-50 border border-stone-200 p-3 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                              <option value="+966">🇸🇦 +966</option>
+                              <option value="+963">🇸🇾 +963</option>
+                            </select>
+                            <input 
+                              type="tel" 
+                              placeholder="5xxxxxxxx"
+                              value={adminBookingData.passengerPhone}
+                              onChange={e => setAdminBookingData({...adminBookingData, passengerPhone: e.target.value})}
+                              className="flex-1 w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-right"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-500">رقم الجواز (اختياري)</label>
+                          <input 
+                            type="text" 
+                            placeholder="رقم جواز السفر"
+                            value={adminBookingData.passportNumber}
+                            onChange={e => setAdminBookingData({...adminBookingData, passportNumber: e.target.value})}
+                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-500">الوجهة (المحطة) *</label>
+                          <select
+                            value={adminBookingData.to || ''}
+                            onChange={e => setAdminBookingData({...adminBookingData, to: e.target.value})}
+                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-right"
+                          >
+                            {(() => {
+                              const trip = trips.find(t => t.id === selectedTripId);
+                              if (!trip) return <option value="">-- اختر الرحلة أولاً --</option>;
+                              
+                              // Filter out stops that are named the same as the main destination or have duplicate city names
+                              const uniqueStops = (trip.stops || []).filter(
+                                (stop, index, self) => 
+                                  stop.cityName !== trip.to && 
+                                  self.findIndex(s => s.cityName === stop.cityName) === index
+                              );
+
+                              return (
+                                <>
+                                  <option key="main-destination" value={trip.to}>{trip.to} (الوجهة الرئيسية)</option>
+                                  {uniqueStops.map((stop, idx) => (
+                                    <option key={`stop-${stop.cityName}-${idx}`} value={stop.cityName}>
+                                      {stop.cityName} (محطة فرعية)
+                                    </option>
+                                  ))}
+                                </>
+                              );
+                            })()}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-500">رقم المقعد *</label>
+                          <select
+                            value={adminBookingData.seatNumber || ''}
+                            onChange={e => setAdminBookingData({...adminBookingData, seatNumber: Number(e.target.value)})}
+                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-right"
+                          >
+                            <option value="">-- اختر مقعداً شاغراً --</option>
+                            {(() => {
+                              const trip = trips.find(t => t.id === selectedTripId);
+                              const totalSeats = trip?.totalSeats || 35;
+                              const bookedSeats = trip?.bookedSeats || [];
+                              const emptySeats: number[] = [];
+                              for (let i = 1; i <= totalSeats; i++) {
+                                if (!bookedSeats.includes(i)) {
+                                  emptySeats.push(i);
+                                }
+                              }
+                              return emptySeats.map(seat => (
+                                <option key={seat} value={seat}>مقعد رقم {seat}</option>
+                              ));
+                            })()}
+                          </select>
+                          <div className="text-[10px] text-stone-400 mt-1">
+                            عدد المقاعد الفارغة المتبقية: {
+                              (() => {
+                                const trip = trips.find(t => t.id === selectedTripId);
+                                const totalSeats = trip?.totalSeats || 35;
+                                const bookedSeats = trip?.bookedSeats || [];
+                                return totalSeats - bookedSeats.length;
+                              })()
+                            } مقعد
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-500">طريقة الدفع</label>
+                          <select
+                            value={adminBookingData.paymentMethod}
+                            onChange={e => setAdminBookingData({...adminBookingData, paymentMethod: e.target.value as any})}
+                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-right"
+                          >
+                            <option value="later">عند السفر (لاحقاً)</option>
+                            <option value="online">دفع إلكتروني</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-500">حالة الحجز</label>
+                          <select
+                            value={adminBookingData.status}
+                            onChange={e => setAdminBookingData({...adminBookingData, status: e.target.value as any})}
+                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-right"
+                          >
+                            <option value="confirmed">مؤكد</option>
+                            <option value="pending">قيد الانتظار</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const trip = trips.find(t => t.id === selectedTripId);
+                        if (!trip) return null;
+                        const tempBooking = {
+                          from: trip.from,
+                          to: adminBookingData.to || trip.to,
+                          tripId: trip.id,
+                        } as Booking;
+                        const priceInfo = getBookingPrice(tempBooking, trip);
+                        return (
+                          <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center text-sm font-bold text-emerald-800" dir="rtl">
+                            <span>سعر التذكرة المعتمد لهذه الوجهة:</span>
+                            <span className="text-lg text-emerald-600 font-bold">{priceInfo.value} {priceInfo.currency}</span>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          onClick={() => setShowAddBookingForm(false)}
+                          className="px-5 py-2.5 rounded-xl text-sm font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 transition-all"
+                        >
+                          إلغاء
+                        </button>
+                        <button
+                          onClick={handleAddAdminBooking}
+                          className="px-5 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all"
+                        >
+                          تأكيد وإضافة الحجز
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
 
                   <div className="overflow-x-auto w-full -mx-4 sm:mx-0">
                     <div className="inline-block min-w-full align-middle">
