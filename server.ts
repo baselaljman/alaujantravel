@@ -15,9 +15,16 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load Firebase Config
+// Load Firebase Config safely
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+let firebaseConfig: any = {};
+if (fs.existsSync(configPath)) {
+  try {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  } catch (err) {
+    console.error("Failed to read or parse firebase-applet-config.json:", err);
+  }
+}
 
 let dbInstance: admin.firestore.Firestore | null = null;
 let firebaseStatus = {
@@ -28,19 +35,21 @@ let firebaseStatus = {
 
 // Robust Firebase Admin Initialization logic
 const initializeFirebaseAdmin = () => {
-  if (admin.apps.length > 0) return;
-
-  console.log("Firebase Admin: Initializing...");
-  
-  const saEnv = process.env.FIREBASE_SERVICE_ACCOUNT || "";
-  
-  if (!saEnv) {
-    console.warn("Firebase Admin: FIREBASE_SERVICE_ACCOUNT env var is missing. Please add it to Secrets.");
-    admin.initializeApp({ projectId: firebaseConfig.projectId });
-    return;
-  }
-
   try {
+    if (admin.apps.length > 0) return;
+
+    console.log("Firebase Admin: Initializing...");
+    
+    const saEnv = process.env.FIREBASE_SERVICE_ACCOUNT || "";
+    
+    if (!saEnv) {
+      console.warn("Firebase Admin: FIREBASE_SERVICE_ACCOUNT env var is missing. Please add it to Secrets.");
+      if (firebaseConfig.projectId) {
+        admin.initializeApp({ projectId: firebaseConfig.projectId });
+      }
+      return;
+    }
+
     let cleanSa = saEnv.trim();
     
     // Strip surrounding single/double quotes if added by the environment/shell
@@ -58,9 +67,7 @@ const initializeFirebaseAdmin = () => {
     }
 
     // Standardize the private key line breaks
-    if (saJson.private_key) {
-      // If the string contains literal \n characters (common in env vars or manual copy), replace them
-      // If it already has real newlines, this won't hurt
+    if (saJson && saJson.private_key) {
       saJson.private_key = saJson.private_key.replace(/\\n/g, '\n');
     }
 
@@ -75,16 +82,14 @@ const initializeFirebaseAdmin = () => {
       console.log(`Firebase Admin: Testing Firestore connection (Project: ${saJson.project_id}, DB: ${dbId || '(default)'})`);
       
       try {
-        // Try the configured database first
         dbInstance = getFirestore(admin.apps[0], dbId);
         await dbInstance.collection('_health_check').doc('ping').get();
         firebaseStatus = { connected: true, error: null, lastChecked: new Date() };
         console.log("Firebase Admin: Firestore connectivity test SUCCESSFUL.");
       } catch (err: any) {
-        console.error(`Firebase Admin: Initial attempt failed. Code: ${err.code}, Message: ${err.message}`);
+        console.error(`Firebase Admin: Initial attempt failed. Code: ${err?.code}, Message: ${err?.message}`);
         
-        // If it's a NOT_FOUND error (5), try falling back to (default)
-        if (err.message.includes("5 NOT_FOUND") || err.code === 5) {
+        if (err?.message?.includes("5 NOT_FOUND") || err?.code === 5) {
           console.log("Firebase Admin: Named database not found. Falling back to (default) database...");
           try {
             dbInstance = getFirestore(admin.apps[0]);
@@ -96,17 +101,20 @@ const initializeFirebaseAdmin = () => {
              console.error("Firebase Admin: FALLBACK also failed:", fallbackErr.message);
           }
         } else {
-          firebaseStatus = { connected: false, error: err.message, lastChecked: new Date() };
+          firebaseStatus = { connected: false, error: err?.message || 'Connection failed', lastChecked: new Date() };
         }
       }
     };
-    testDbAccess();
+    testDbAccess().catch(err => console.error("testDbAccess error:", err));
 
   } catch (err: any) {
-    console.error("Firebase Admin: Initialization failed:", err.message);
-    // Emergency Fallback
-    if (!admin.apps.length) {
-      admin.initializeApp({ projectId: firebaseConfig.projectId });
+    console.error("Firebase Admin: Initialization failed:", err?.message);
+    if (!admin.apps.length && firebaseConfig.projectId) {
+      try {
+        admin.initializeApp({ projectId: firebaseConfig.projectId });
+      } catch (e) {
+        console.error("Emergency fallback initialization failed:", e);
+      }
     }
   }
 };

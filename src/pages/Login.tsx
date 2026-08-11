@@ -16,9 +16,20 @@ export default function Login() {
   const [selectedCountry, setSelectedCountry] = useState({ code: '+966', flag: '🇸🇦', name: 'السعودية' });
   const [syriaSubMode, setSyriaSubMode] = useState<'login' | 'register'>('register');
   const [showOtpInput, setShowOtpInput] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    let timer: any;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const countries = [
     { code: '+966', flag: '🇸🇦', name: 'السعودية' },
@@ -91,6 +102,7 @@ export default function Login() {
         await sendSmsOtp(formattedPhone);
         
         setShowOtpInput(true);
+        setResendCooldown(60);
         setMessage(`تم إرسال كود التحقق إلى رقم هاتفك بنجاح ✅`);
       } else {
         await verifySmsOtp(formattedPhone, otp);
@@ -98,8 +110,41 @@ export default function Login() {
       }
     } catch (err: any) {
       console.error('Phone Auth Error:', err);
-      setError(err.message || 'فشل التحقق من رقم الهاتف. تأكد من صحة الرقم ومن وجود رصيد في UniMatrix.');
+      if (err?.code === 'auth/too-many-requests' || err?.message?.includes('too-many-requests')) {
+        setError('تم تجاوز عدد المحاولات المسموح بها مؤقتاً بواسطة Firebase (auth/too-many-requests). يرجى الانتظار 10 إلى 15 دقيقة، أو استخدام خيار الدخول بـ "جوجل" أو "البريد الإلكتروني".');
+      } else {
+        setError(err.message || 'فشل التحقق من رقم الهاتف. تأكد من صحة الرقم ومن صيغته الصحيحة.');
+      }
       setMessage('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0 || loading) return;
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      let cleanPhone = phone.trim();
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = cleanPhone.substring(1);
+      }
+      cleanPhone = cleanPhone.replace(/\D/g, '');
+      const formattedPhone = `${selectedCountry.code}${cleanPhone}`;
+
+      setMessage('جاري إرسال كود جديد...');
+      await sendSmsOtp(formattedPhone);
+      setResendCooldown(60);
+      setMessage('تم إرسال كود تحقق جديد بنجاح ✅');
+    } catch (err: any) {
+      console.error('Resend SMS Error:', err);
+      if (err?.code === 'auth/too-many-requests' || err?.message?.includes('too-many-requests')) {
+        setError('تم حظر إرسال الرسائل مؤقتاً لكثرة الطلبات. يرجى الانتظار بضع دقائق.');
+      } else {
+        setError(err.message || 'فشل إعادة إرسال الرمز.');
+      }
     } finally {
       setLoading(false);
     }
@@ -325,13 +370,29 @@ export default function Login() {
             </button>
             
             {showOtpInput && (
-              <button
-                type="button"
-                onClick={() => setShowOtpInput(false)}
-                className="w-full text-xs text-stone-400 hover:text-emerald-600 transition-colors"
-              >
-                تغيير رقم الهاتف
-              </button>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={resendCooldown > 0 || loading}
+                  className={`w-full py-2 rounded-xl text-xs font-bold transition-all ${
+                    resendCooldown > 0 || loading
+                      ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                >
+                  {resendCooldown > 0
+                    ? `إعادة إرسال الرمز بعد (${resendCooldown} ثانية)`
+                    : 'إعادة إرسال كود التحقق SMS'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOtpInput(false)}
+                  className="w-full text-xs text-stone-400 hover:text-emerald-600 transition-colors py-1"
+                >
+                  تغيير رقم الهاتف
+                </button>
+              </div>
             )}
           </form>
         ) : (

@@ -463,6 +463,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error('Phone Sign-In Error:', error);
       
+      // Handle too-many-requests
+      if (error.code === 'auth/too-many-requests') {
+        throw new Error('تم تجاوز الحد المسموح لإرسال رسائل SMS مؤقتاً من Firebase. يرجى الانتظار عدة دقائق قبل إعادة المحاولة، أو إضافة رقم هاتف للاختبار في Firebase Console لتجنب الحظر.');
+      }
+
       // Specialized cleanup for recaptcha errors
       if (error.code === 'auth/argument-error' || error.code === 'auth/invalid-app-credential') {
         console.log('Cleaning up verifier after specific error');
