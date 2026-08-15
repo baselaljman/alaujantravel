@@ -112,6 +112,8 @@ export default function Login() {
       console.error('Phone Auth Error:', err);
       if (err?.code === 'auth/too-many-requests' || err?.message?.includes('too-many-requests')) {
         setError('تم تجاوز عدد المحاولات المسموح بها مؤقتاً بواسطة Firebase (auth/too-many-requests). يرجى الانتظار 10 إلى 15 دقيقة، أو استخدام خيار الدخول بـ "جوجل" أو "البريد الإلكتروني".');
+      } else if (err?.code === 'auth/captcha-check-failed' || err?.message?.includes('-39') || err?.message?.includes('error-code:-39')) {
+        setError('فشل التحقق من أمان reCAPTCHA (خطأ -39). يرجى إعادة المحاولة أو إدخال كود التحقق إذا وصلك، أو استخدام الدخول بجوجل/البريد.');
       } else {
         setError(err.message || 'فشل التحقق من رقم الهاتف. تأكد من صحة الرقم ومن صيغته الصحيحة.');
       }
@@ -196,8 +198,17 @@ export default function Login() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs text-center border border-red-100">
-            {error}
+          <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs text-center border border-red-100 space-y-2">
+            <div>{error}</div>
+            {(error.includes('too-many-requests') || error.includes('SMS') || error.includes('تجاوز')) && authMode === 'phone' && (
+              <button
+                type="button"
+                onClick={() => { setAuthMode('email-login'); setError(''); setMessage(''); }}
+                className="inline-block mt-1 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-lg text-xs transition-colors"
+              >
+                👈 الانتقال للدخول بالبريد الإلكتروني / Google فوراً
+              </button>
+            )}
           </div>
         )}
 
@@ -465,7 +476,7 @@ export default function Login() {
         </form>
         )}
 
-        <div id="recaptcha-container"></div>
+        <div id="recaptcha-container" className="my-2 flex justify-center"></div>
 
         <div className="relative py-2">
           <div className="absolute inset-0 flex items-center">

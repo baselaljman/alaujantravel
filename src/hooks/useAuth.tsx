@@ -390,9 +390,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
-  const setupRecaptcha = async (containerId: string = 'recaptcha-container') => {
+  const safeClearVerifier = (verifierInstance: any) => {
+    if (!verifierInstance) return;
     try {
-      console.log('--- setupRecaptcha Start ---');
+      if (typeof verifierInstance.clear === 'function') {
+        verifierInstance.clear();
+      }
+    } catch (err) {
+      console.log('Suppressed recaptcha verifier clear error:', err);
+    }
+  };
+
+  const setupRecaptcha = async (containerId: string = 'recaptcha-container', size: 'invisible' | 'normal' = 'invisible') => {
+    try {
+      console.log('--- setupRecaptcha Start ---', { containerId, size });
       
       if (typeof window === 'undefined') return null;
       
@@ -402,28 +413,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`لم يتم العثور على عنصر التحقق (reCAPTCHA) بالمعرف: ${containerId}`);
       }
 
-      // If we have an existing verifier, try to clear it
-      if (recaptchaVerifier) {
-        console.log('Clearing existing verifier');
-        try { recaptchaVerifier.clear(); } catch (e) {}
+      // 1. Clear window verifier safely
+      if ((window as any).recaptchaVerifier) {
+        safeClearVerifier((window as any).recaptchaVerifier);
+        (window as any).recaptchaVerifier = null;
       }
 
-      // Ensure dry element
-      element.innerHTML = '';
+      // 2. Clear state verifier safely
+      if (recaptchaVerifier) {
+        safeClearVerifier(recaptchaVerifier);
+        setRecaptchaVerifier(null);
+      }
 
-      console.log('Creating new RecaptchaVerifier');
-      // SIGNATURE: new RecaptchaVerifier(auth, element, parameters)
+      // 3. Clear container element DOM safely
+      try {
+        element.innerHTML = '';
+      } catch (e) {}
+
+      console.log(`Creating new RecaptchaVerifier (size: ${size})`);
       const verifier = new RecaptchaVerifier(auth, element, {
-        size: 'invisible',
+        size: size,
         callback: (response: any) => {
           console.log('reCAPTCHA solved successfully', !!response);
         },
         'expired-callback': () => {
           console.log('reCAPTCHA expired');
+          safeClearVerifier(verifier);
+          if ((window as any).recaptchaVerifier === verifier) {
+            (window as any).recaptchaVerifier = null;
+          }
           setRecaptchaVerifier(null);
         }
       });
       
+      // If normal (visible), render it right away
+      if (size === 'normal') {
+        try {
+          await verifier.render();
+        } catch (renderErr) {
+          console.warn('Recaptcha render warning:', renderErr);
+        }
+      }
+
+      (window as any).recaptchaVerifier = verifier;
       setRecaptchaVerifier(verifier);
       return verifier;
     } catch (error: any) {
@@ -433,10 +465,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithPhone = async (phoneNumber: string, recaptchaContainerId: string = 'recaptcha-container') => {
+    let verifier: RecaptchaVerifier | null = null;
     try {
       console.log('--- SignInWithPhone Start ---');
       
-      // Clear any previous confirmation result to avoid stale state
       setConfirmationResult(null);
       
       let finalPhone = phoneNumber.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -448,34 +480,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('رقم الهاتف غير صالح، يجب أن يبدأ بـ + ويتضمن مفتاح الدولة');
       }
 
-      // Ensure we have a fresh verifier
-      const verifier = await setupRecaptcha(recaptchaContainerId);
-      if (!verifier) throw new Error('فشل تهيئة مدقق التحقق');
-      
-      console.log('Calling signInWithPhoneNumber with details:', {
-        phone: finalPhone,
-        verifierType: typeof verifier,
-        isVerifierObject: !!verifier
-      });
-      const result = await signInWithPhoneNumber(auth, finalPhone, verifier);
-      console.log('signInWithPhoneNumber Success');
-      setConfirmationResult(result);
+      // Try invisible first
+      try {
+        verifier = await setupRecaptcha(recaptchaContainerId, 'invisible');
+        if (!verifier) throw new Error('فشل تهيئة مدقق التحقق');
+        
+        console.log('Calling signInWithPhoneNumber with invisible recaptcha...');
+        const result = await signInWithPhoneNumber(auth, finalPhone, verifier);
+        console.log('signInWithPhoneNumber Success');
+        setConfirmationResult(result);
+        return;
+      } catch (firstErr: any) {
+        console.warn('Invisible recaptcha attempt failed:', firstErr);
+        
+        const isCaptchaError = firstErr?.code === 'auth/captcha-check-failed' || 
+                               firstErr?.message?.includes('-39') || 
+                               firstErr?.message?.includes('error-code:-39');
+        
+        if (isCaptchaError) {
+          console.log('Retrying with normal (visible) recaptcha...');
+          verifier = await setupRecaptcha(recaptchaContainerId, 'normal');
+          if (!verifier) throw new Error('فشل تهيئة مدقق التحقق');
+          
+          const result = await signInWithPhoneNumber(auth, finalPhone, verifier);
+          console.log('signInWithPhoneNumber Success with normal recaptcha');
+          setConfirmationResult(result);
+          return;
+        } else {
+          throw firstErr;
+        }
+      }
     } catch (error: any) {
       console.error('Phone Sign-In Error:', error);
       
-      // Handle too-many-requests
-      if (error.code === 'auth/too-many-requests') {
-        throw new Error('تم تجاوز الحد المسموح لإرسال رسائل SMS مؤقتاً من Firebase. يرجى الانتظار عدة دقائق قبل إعادة المحاولة، أو إضافة رقم هاتف للاختبار في Firebase Console لتجنب الحظر.');
+      // Clean up verifier on failure
+      if ((window as any).recaptchaVerifier) {
+        safeClearVerifier((window as any).recaptchaVerifier);
+        (window as any).recaptchaVerifier = null;
+      }
+      if (verifier) {
+        safeClearVerifier(verifier);
+      }
+      if (recaptchaVerifier) {
+        safeClearVerifier(recaptchaVerifier);
+      }
+      try {
+        const element = document.getElementById(recaptchaContainerId);
+        if (element) element.innerHTML = '';
+      } catch (e) {}
+      setRecaptchaVerifier(null);
+
+      if (error.code === 'auth/too-many-requests' || error.message?.includes('too-many-requests')) {
+        throw new Error('تم تجاوز الحد المسموح لإرسال رسائل SMS مؤقتاً من Firebase. يرجى الانتظار عدة دقائق قبل إعادة المحاولة، أو تجربة الدخول عبر البريد/جوجل.');
       }
 
-      // Specialized cleanup for recaptcha errors
-      if (error.code === 'auth/argument-error' || error.code === 'auth/invalid-app-credential') {
-        console.log('Cleaning up verifier after specific error');
-        if (recaptchaVerifier) {
-          try { recaptchaVerifier.clear(); } catch(e) {}
-        }
-        setRecaptchaVerifier(null);
+      if (error.code === 'auth/captcha-check-failed' || error.message?.includes('-39') || error.message?.includes('error-code:-39')) {
+        throw new Error('فشل التحقق الأمني من reCAPTCHA (خطأ -39). يرجى التأكد من الضغط على زر إرسال الكود مجدداً أو وضع علامة على مربع التحقق.');
       }
+
+      if (error.code === 'auth/argument-error' || error.code === 'auth/invalid-app-credential') {
+        throw new Error('خطأ في إعدادات الاعتماد للتحقق عبر الهاتف. يرجى المحاولة لاحقاً أو استخدام الدخول عبر جوجل.');
+      }
+
       throw error;
     }
   };
