@@ -212,7 +212,7 @@ export default function AdminDashboard() {
       const originalDisplay = element.style.display;
       element.style.display = 'block';
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         backgroundColor: '#ffffff',
         onclone: (clonedDoc) => {
@@ -222,14 +222,14 @@ export default function AdminDashboard() {
 
           const style = clonedDoc.createElement('style');
           style.innerHTML = `
-            :root {
-              --color-emerald-500: #10b981 !important;
-              --color-emerald-600: #059669 !important;
-              --color-emerald-700: #047857 !important;
-              --color-stone-100: #f5f5f4 !important;
-              --color-stone-400: #a8a29e !important;
-              --color-stone-500: #78716c !important;
-              --color-stone-600: #57534e !important;
+            * {
+              color: #000000 !important;
+              border-color: #000000 !important;
+              background-image: none !important;
+              text-shadow: none !important;
+              box-shadow: none !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
           `;
           clonedDoc.head?.appendChild(style);
@@ -238,6 +238,47 @@ export default function AdminDashboard() {
       element.style.display = originalDisplay || 'none';
       
       const imgData = canvas.toDataURL('image/png');
+
+      // Open print window with pure black ticket for direct printing
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html dir="rtl">
+            <head>
+              <title>طباعة تذكرة - ${booking.passengerName}</title>
+              <style>
+                @media print {
+                  @page { size: auto; margin: 8mm; }
+                  body { margin: 0; padding: 0; background: #ffffff !important; }
+                }
+                body {
+                  margin: 0;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  min-height: 100vh;
+                  background-color: #ffffff;
+                  font-family: Arial, sans-serif;
+                }
+                img {
+                  max-width: 100%;
+                  height: auto;
+                  display: block;
+                  margin: 0 auto;
+                  image-rendering: -webkit-optimize-contrast;
+                }
+              </style>
+            </head>
+            <body>
+              <img src="${imgData}" onload="setTimeout(function(){ window.print(); window.onafterprint = function(){ window.close(); }; }, 300);" />
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+
       const link = document.createElement('a');
       link.download = `ticket-${booking.passengerName}-${booking.id.slice(0, 8)}.png`;
       link.href = imgData;
@@ -274,14 +315,14 @@ export default function AdminDashboard() {
               .page { page-break-after: always; break-after: page; }
               .page:last-child { page-break-after: avoid; break-after: avoid; }
             }
-            body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; }
+            body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; color: #000000; }
             .page { min-height: 100%; box-sizing: border-box; padding-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: right; }
-            th { background-color: #f8f9fa; }
-            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #059669; padding-bottom: 10px; position: relative; }
-            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #fafafa; padding: 8px; border-radius: 6px; }
-            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; }
+            th, td { border: 1.5px solid #000000; padding: 4px 6px; text-align: right; color: #000000; }
+            th { background-color: #ffffff; color: #000000; font-weight: 900; border-bottom: 2px solid #000000; }
+            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000000; padding-bottom: 10px; position: relative; color: #000000; }
+            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #ffffff; border: 1.5px solid #000000; padding: 8px; border-radius: 6px; color: #000000; }
+            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #000000; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -420,15 +461,15 @@ export default function AdminDashboard() {
               .page { page-break-after: always; break-after: page; }
               .page:last-child { page-break-after: avoid; break-after: avoid; }
             }
-            body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; }
+            body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; color: #000000; }
             .page { min-height: 100%; box-sizing: border-box; padding-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: right; }
-            th { background-color: #f8f9fa; }
-            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #059669; padding-bottom: 10px; position: relative; }
-            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #fafafa; padding: 8px; border-radius: 6px; }
-            .summary-box { background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; font-weight: bold; color: #166534; display: flex; justify-content: space-between; }
-            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; }
+            th, td { border: 1.5px solid #000000; padding: 4px 6px; text-align: right; color: #000000; }
+            th { background-color: #ffffff; color: #000000; font-weight: 900; border-bottom: 2px solid #000000; }
+            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000000; padding-bottom: 10px; position: relative; color: #000000; }
+            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #ffffff; border: 1.5px solid #000000; padding: 8px; border-radius: 6px; color: #000000; }
+            .summary-box { background-color: #ffffff; border: 2px solid #000000; padding: 8px 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; font-weight: bold; color: #000000; display: flex; justify-content: space-between; }
+            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #000000; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -542,14 +583,14 @@ export default function AdminDashboard() {
         <head>
           <title>كشف شحنات الرحلة - ${trip.from} إلى ${trip.to}</title>
           <style>
-            body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; }
+            body { font-family: 'Arial', sans-serif; padding: 40px; color: #000000; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 12px; text-align: right; font-size: 14px; }
-            th { background-color: #f8f9fa; color: #059669; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #059669; padding-bottom: 20px; }
-            .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 14px; }
-            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
-            .price-total { text-align: left; margin-top: 20px; font-weight: bold; font-size: 16px; color: #059669; }
+            th, td { border: 1.5px solid #000000; padding: 12px; text-align: right; font-size: 14px; color: #000000; }
+            th { background-color: #ffffff; color: #000000; font-weight: 900; border-bottom: 2px solid #000000; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000000; padding-bottom: 20px; color: #000000; }
+            .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 14px; border: 1.5px solid #000000; padding: 14px; border-radius: 6px; color: #000000; }
+            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #000000; font-weight: bold; }
+            .price-total { text-align: left; margin-top: 20px; font-weight: 900; font-size: 16px; color: #000000; }
           </style>
         </head>
         <body>
@@ -1126,20 +1167,20 @@ export default function AdminDashboard() {
               size: A4 portrait;
               margin: 8mm;
             }
-            body { font-family: 'Arial', sans-serif; padding: 15px; color: #333; background: #fff; margin: 0; }
-            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, .05); font-size: 14px; line-height: 1.4; border-radius: 8px; }
-            .header { border-bottom: 2px solid #059669; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-            .company-info h1 { margin: 0; color: #059669; font-size: 20px; }
-            .company-info p { margin: 2px 0 0 0; font-size: 13px; color: #666; }
-            .tracking p { margin: 2px 0; font-size: 13px; }
-            .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-            .section-title { font-weight: bold; color: #059669; border-bottom: 1px solid #eee; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px; }
-            .info-row { margin-bottom: 4px; font-size: 12px; }
-            .info-label { font-weight: bold; color: #666; }
-            .price-section { margin-top: 15px; padding: 12px 15px; background: #f9f9f9; border-radius: 8px; text-align: left; display: flex; justify-content: space-between; align-items: center; }
-            .price-section .info-label { font-size: 13px; margin: 0; }
-            .total-price { font-size: 18px; font-weight: bold; color: #059669; margin: 0; }
-            .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+            body { font-family: 'Arial', sans-serif; padding: 15px; color: #000000; background: #fff; margin: 0; }
+            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 1.5px solid #000000; box-shadow: none; font-size: 14px; line-height: 1.4; border-radius: 8px; color: #000000; }
+            .header { border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; color: #000000; }
+            .company-info h1 { margin: 0; color: #000000; font-size: 20px; font-weight: 900; }
+            .company-info p { margin: 2px 0 0 0; font-size: 13px; color: #000000; font-weight: bold; }
+            .tracking p { margin: 2px 0; font-size: 13px; color: #000000; }
+            .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; color: #000000; }
+            .section-title { font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px; }
+            .info-row { margin-bottom: 4px; font-size: 12px; color: #000000; }
+            .info-label { font-weight: 900; color: #000000; }
+            .price-section { margin-top: 15px; padding: 12px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; text-align: left; display: flex; justify-content: space-between; align-items: center; color: #000000; }
+            .price-section .info-label { font-size: 13px; margin: 0; font-weight: 900; color: #000000; }
+            .total-price { font-size: 18px; font-weight: 900; color: #000000; margin: 0; }
+            .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #000000; border-top: 1.5px solid #000000; padding-top: 10px; font-weight: bold; }
             @media print {
               .no-print { display: none; }
               body { padding: 0; margin: 0; }
@@ -1208,31 +1249,31 @@ export default function AdminDashboard() {
               <div class="total-price">${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}</div>
             </div>
 
-            <div class="terms-section" style="margin-top: 25px; border: 1px dashed #ddd; border-radius: 8px; padding: 15px; background: #fafafa; font-size: 11px; color: #555; line-height: 1.8; text-align: right;">
-              <div style="font-size: 13px; font-weight: bold; color: #059669; margin-bottom: 8px; border-bottom: 2px solid #059669; padding-bottom: 4px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
-              <ul style="padding-right: 15px; margin: 0; list-style-type: none;">
-                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
-                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+            <div class="terms-section" style="margin-top: 25px; border: 1.5px solid #000000; border-radius: 8px; padding: 15px; background: #ffffff; font-size: 11px; color: #000000; line-height: 1.8; text-align: right;">
+              <div style="font-size: 13px; font-weight: 900; color: #000000; margin-bottom: 8px; border-bottom: 2px solid #000000; padding-bottom: 4px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
+              <ul style="padding-right: 15px; margin: 0; list-style-type: none; color: #000000;">
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
+                  <span style="position: absolute; right: 0; color: #000000; font-weight: 900;">*</span>
                   الشركة غير مسؤولة عن البضائع إذا لم يتم إستلامها خلال ١٠ أيام وعن سندات الاستلام بعد ١٥ يوم من تاريخ الاستلام.
                 </li>
-                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
-                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
+                  <span style="position: absolute; right: 0; color: #000000; font-weight: 900;">*</span>
                   الشركة غير مسؤولة عما بداخل الإرساليه من أشياء قابله للكسر أو ثمينة بدون تأمين من قبلنا.
                 </li>
-                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
-                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
+                  <span style="position: absolute; right: 0; color: #000000; font-weight: 900;">*</span>
                   في حالة فقدان الارسالية الشركة لا تتحمل أكثر من ١٠٠ ريال كقيمة الارسالية إذا لم يتم تأمين عليه من قبلنا.
                 </li>
-                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
-                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">•</span>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
+                  <span style="position: absolute; right: 0; color: #000000; font-weight: 900;">•</span>
                   استلامك الفاتورة يعتبر إطلاعك على الشروط.
                 </li>
-                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
-                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
+                  <span style="position: absolute; right: 0; color: #000000; font-weight: 900;">*</span>
                   الشركة لا تتحمل مسؤولية الإرسالية في حالة تعرضها لكوارث طبيعية ولم يكتب عليها الاسم أو رقم التواصل.
                 </li>
-                <li style="margin-bottom: 5px; position: relative; padding-right: 15px;">
-                  <span style="position: absolute; right: 0; color: #059669; font-weight: bold;">*</span>
+                <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
+                  <span style="position: absolute; right: 0; color: #000000; font-weight: 900;">*</span>
                   الشركة غير مسؤولة عن مابداخل الإرسالية الغير مصرح بها.
                 </li>
               </ul>
@@ -2906,25 +2947,27 @@ export default function AdminDashboard() {
                                 <div style={{ 
                                   display: 'flex', 
                                   height: '100%', 
-                                  border: '2px solid #059669',
-                                  borderRadius: '15px',
+                                  border: '2.5px solid #000000',
+                                  borderRadius: '12px',
                                   overflow: 'hidden',
                                   direction: 'rtl',
-                                  boxSizing: 'border-box'
+                                  boxSizing: 'border-box',
+                                  backgroundColor: '#ffffff'
                                 }}>
                                   {/* Main Part */}
                                   <div style={{ 
                                     flex: 3, 
                                     padding: '20px', 
                                     position: 'relative', 
-                                    borderLeft: '2px dashed #dddddd', 
+                                    borderLeft: '2.5px dashed #000000', 
                                     textAlign: 'right',
-                                    boxSizing: 'border-box'
+                                    boxSizing: 'border-box',
+                                    backgroundColor: '#ffffff'
                                   }}>
                                     <div style={{ 
                                       display: 'flex', 
                                       justifyContent: 'space-between', 
-                                      marginBottom: '20px', 
+                                      marginBottom: '16px', 
                                       alignItems: 'flex-start' 
                                     }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2932,31 +2975,31 @@ export default function AdminDashboard() {
                                           src="/logoaujantravel.jpeg" 
                                           alt="Logo" 
                                           referrerPolicy="no-referrer"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '50%' }} 
+                                          style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '50%', border: '2px solid #000000' }} 
                                         />
                                         <div>
-                                          <h2 style={{ margin: 0, color: '#065f46', fontSize: '20px', fontWeight: 'bold' }}>العوجان للسياحة</h2>
-                                          <p style={{ margin: 0, fontSize: '10px', color: '#666666' }}>INTERNATIONAL BOARDING PASS</p>
+                                          <h2 style={{ margin: 0, color: '#000000', fontSize: '22px', fontWeight: '900' }}>العوجان للسياحة</h2>
+                                          <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold', letterSpacing: '0.5px' }}>INTERNATIONAL BOARDING PASS</p>
                                         </div>
                                       </div>
                                       <div style={{ textAlign: 'left' }}>
-                                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#1c1917' }}>رقم التتبع: {trips.find(t => t.id === booking.tripId)?.trackingNumber}</p>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#059669', fontWeight: 'bold' }}>CONFIRMED</p>
+                                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#000000' }}>رقم التتبع: {trips.find(t => t.id === booking.tripId)?.trackingNumber}</p>
+                                        <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>CONFIRMED / مؤكد</p>
                                       </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-                                      <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>اسم المسافر</p>
-                                        <p style={{ margin: '2px 0 0 0', fontWeight: 'bold', fontSize: '14px', color: '#1c1917' }}>{booking.passengerName}</p>
+                                    <div style={{ display: 'flex', gap: '20px', marginBottom: '14px' }}>
+                                      <div style={{ flex: 1.2 }}>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>اسم المسافر</p>
+                                        <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '15px', color: '#000000' }}>{booking.passengerName}</p>
                                       </div>
                                       <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>رقم الجواز</p>
-                                        <p style={{ margin: '2px 0 0 0', fontWeight: 'bold', fontSize: '14px', color: '#1c1917' }}>{booking.passportNumber || '---'}</p>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الجواز</p>
+                                        <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', color: '#000000' }}>{booking.passportNumber || '---'}</p>
                                       </div>
                                       <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>رقم الحجز</p>
-                                        <p style={{ margin: '2px 0 0 0', fontWeight: 'bold', fontSize: '14px', fontFamily: 'monospace', color: '#1c1917' }}>{booking.id.slice(0, 8)}</p>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الحجز</p>
+                                        <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', fontFamily: 'monospace', color: '#000000' }}>{booking.id.slice(0, 8)}</p>
                                       </div>
                                     </div>
 
@@ -2964,35 +3007,36 @@ export default function AdminDashboard() {
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       gap: '20px', 
-                                      marginTop: '20px', 
-                                      backgroundColor: '#ecfdf5', 
-                                      padding: '15px', 
-                                      borderRadius: '10px',
+                                      margin: '12px 0', 
+                                      backgroundColor: '#ffffff', 
+                                      border: '2px solid #000000',
+                                      padding: '10px 14px', 
+                                      borderRadius: '8px',
                                       boxSizing: 'border-box'
                                     }}>
                                       <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#059669', fontWeight: 'normal' }}>من</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#065f46' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>من</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
                                       </div>
-                                      <div style={{ color: '#6ee7b7', fontSize: '24px' }}>←</div>
+                                      <div style={{ color: '#000000', fontSize: '24px', fontWeight: '900' }}>←</div>
                                       <div style={{ flex: 1, textAlign: 'left' }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#059669', fontWeight: 'normal' }}>إلى</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#065f46' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
                                       </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
+                                    <div style={{ display: 'flex', gap: '20px', marginTop: '12px' }}>
                                       <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>التاريخ</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', color: '#1c1917' }}>{trips.find(t => t.id === booking.tripId)?.date}</p>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{trips.find(t => t.id === booking.tripId)?.date}</p>
                                       </div>
                                       <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>الوقت</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', color: '#1c1917' }}>{trips.find(t => t.id === booking.tripId)?.time}</p>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>الوقت</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{trips.find(t => t.id === booking.tripId)?.time}</p>
                                       </div>
                                       <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>المقعد</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '18px', color: '#059669' }}>{booking.seatNumber}</p>
+                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '20px', color: '#000000' }}>{booking.seatNumber}</p>
                                       </div>
                                       {(() => {
                                         const tripObj = trips.find(t => t.id === booking.tripId);
@@ -3001,10 +3045,10 @@ export default function AdminDashboard() {
                                         const total = priceInfo.value + extra;
                                         return (
                                           <div style={{ flex: 1 }}>
-                                            <p style={{ margin: 0, fontSize: '10px', color: '#999999', fontWeight: 'normal' }}>سعر التذكرة</p>
-                                            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '16px', color: '#059669' }}>{total} {priceInfo.currency}</p>
+                                            <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>سعر التذكرة</p>
+                                            <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>{total} {priceInfo.currency}</p>
                                             {extra > 0 && (
-                                              <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#b45309', fontWeight: 'bold' }}>
+                                              <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>
                                                 (يشمل {booking.extraParcelsCount} طرود: +{extra} {priceInfo.currency})
                                               </p>
                                             )}
@@ -3017,55 +3061,59 @@ export default function AdminDashboard() {
                                   {/* Stub Part */}
                                   <div style={{ 
                                     flex: 1, 
-                                    padding: '20px', 
-                                    backgroundColor: '#f9fafb', 
+                                    padding: '16px', 
+                                    backgroundColor: '#ffffff', 
                                     textAlign: 'right',
                                     boxSizing: 'border-box'
                                   }}>
-                                    <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-                                      <p style={{ margin: 0, fontSize: '10px', fontWeight: 'bold', color: '#065f46' }}>بطاقة صعود</p>
-                                      <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>نسخة المسافر</p>
+                                    <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '1.5px solid #000000', paddingBottom: '6px' }}>
+                                      <p style={{ margin: 0, fontSize: '11px', fontWeight: '900', color: '#000000' }}>بطاقة صعود</p>
+                                      <p style={{ margin: 0, fontSize: '9px', color: '#000000', fontWeight: 'bold' }}>نسخة المسافر</p>
                                     </div>
-                                    <div style={{ marginBottom: '10px' }}>
-                                      <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>الاسم</p>
-                                      <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{booking.passengerName}</p>
+                                    <div style={{ marginBottom: '8px' }}>
+                                      <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>الاسم</p>
+                                      <p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: '#000000' }}>{booking.passengerName}</p>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                       <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>من</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
+                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>من</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
                                       </div>
                                       <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>إلى</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
+                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
                                       </div>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                       <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>التاريخ</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#1c1917' }}>{trips.find(t => t.id === booking.tripId)?.date}</p>
+                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{trips.find(t => t.id === booking.tripId)?.date}</p>
                                       </div>
                                       <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>المقعد</p>
-                                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '12px', color: '#059669' }}>{booking.seatNumber}</p>
+                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
+                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{booking.seatNumber}</p>
                                       </div>
                                       <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#999999' }}>السعر</p>
+                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>السعر</p>
                                         {(() => {
                                           const tripObj = trips.find(t => t.id === booking.tripId);
                                           const priceInfo = tripObj ? getBookingPrice(booking, tripObj) : { value: 0, currency: '' };
                                           const extra = booking.extraParcelsPrice || 0;
                                           return (
-                                            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px', color: '#059669' }}>
+                                            <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>
                                               {priceInfo.value + extra} {priceInfo.currency}
                                             </p>
                                           );
                                         })()}
                                       </div>
                                     </div>
-                                    <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                                      <div style={{ backgroundColor: '#eeeeee', height: '30px', width: '100%', borderRadius: '4px' }}></div>
-                                      <p style={{ margin: '5px 0 0 0', fontSize: '8px', fontFamily: 'monospace', color: '#999999' }}>{booking.id.slice(0, 10)}</p>
+                                    <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2px', height: '26px', padding: '2px 0' }}>
+                                        {[4,2,3,1,4,2,1,3,2,4,1,2,3,2,1,4,3,1,2,4,2,1,3,2,4,1,3].map((w, bi) => (
+                                          <div key={bi} style={{ width: `${w}px`, height: '100%', backgroundColor: '#000000' }} />
+                                        ))}
+                                      </div>
+                                      <p style={{ margin: '3px 0 0 0', fontSize: '8px', fontFamily: 'monospace', color: '#000000', fontWeight: '900' }}>{booking.id.slice(0, 10).toUpperCase()}</p>
                                     </div>
                                   </div>
                                 </div>
