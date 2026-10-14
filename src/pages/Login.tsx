@@ -476,8 +476,6 @@ export default function Login() {
         </form>
         )}
 
-        <div id="recaptcha-container" className="my-2 flex justify-center"></div>
-
         <div className="relative py-2">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-stone-200"></div>
