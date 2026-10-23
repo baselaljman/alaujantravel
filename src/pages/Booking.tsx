@@ -1040,7 +1040,7 @@ export default function BookingPage() {
                     <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: '900', color: '#000000', margin: 0 }}>{selectedTrip?.trackingNumber}</p></div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '12px' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>الهاتف</p><p style={{ fontWeight: '900', fontSize: '13px', color: '#000000', margin: 0 }}>{booking.passengerPhone}</p></div>
+                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم العميل / الهاتف</p><p style={{ fontWeight: '900', fontSize: '14px', color: '#000000', margin: 0, letterSpacing: '0.5px' }}>{booking.passengerPhone || '---'}</p></div>
                   </div>
                   <div style={{ backgroundColor: '#ffffff', border: '2px solid #000000', padding: '12px 14px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
                     <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>من</p><p style={{ fontWeight: '900', fontSize: '18px', color: '#000000', margin: 0 }}>{booking.from || selectedTrip?.from}</p></div>
@@ -1057,6 +1057,15 @@ export default function BookingPage() {
                   </div>
                   <div style={{ backgroundColor: '#ffffff', padding: '8px', borderRadius: '8px', border: '1.5px solid #000000', textAlign: 'center' }}>
                     <p style={{ fontSize: '10px', color: '#000000', fontWeight: '900', margin: 0 }}>🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً</p>
+                  </div>
+                  {/* أرقام الفروع */}
+                  <div style={{ backgroundColor: '#ffffff', padding: '7px 8px', borderRadius: '8px', border: '1.5px solid #000000', textAlign: 'center' }}>
+                    <p style={{ fontSize: '9px', color: '#000000', fontWeight: '900', margin: '0 0 3px 0' }}>📞 أرقام فروع العوجان للسياحة</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', fontSize: '9px', fontWeight: '900', color: '#000000' }}>
+                      <span>الرياض: ٠٥٠٠٠٩٤٢١٠</span>
+                      <span>جدة: ٠٥٣١١٦٠٠٧٩</span>
+                      <span>سوريا: ٠٩٤٣٠١٣١١٣</span>
+                    </div>
                   </div>
                 </div>
                 <div style={{ borderTop: '2.5px dashed #000000', paddingTop: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>

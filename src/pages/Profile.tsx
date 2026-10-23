@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, or, deleteDoc, getDocs, doc } fro
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { Booking, Trip, City } from '../types';
-import { Calendar, Download, MapPin, Ticket, User, Loader2, Share as ShareIcon, Trash2, ShieldAlert } from 'lucide-react';
+import { Calendar, Download, MapPin, Ticket, User, Loader2, Share as ShareIcon, Trash2, ShieldAlert, Printer } from 'lucide-react';
 import { motion } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import { Capacitor } from '@capacitor/core';
@@ -143,6 +143,90 @@ export default function Profile() {
         }
       } catch (error) {
         console.error('Error generating ticket:', error);
+      } finally {
+        setDownloadingId(null);
+      }
+    }, 100);
+  };
+
+  const handlePrintTicket = async (booking: Booking, trip?: Trip) => {
+    if (!trip) return;
+    setDownloadingId(booking.id);
+    setTimeout(async () => {
+      try {
+        const element = document.getElementById(`ticket-to-download-${booking.id}`);
+        if (element) {
+          const canvas = await html2canvas(element, {
+            scale: 3,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#ffffff',
+            onclone: (clonedDoc) => {
+              const images = clonedDoc.getElementsByTagName('img');
+              for (let img of images) {
+                img.style.visibility = 'visible';
+                img.style.opacity = '1';
+              }
+              const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+              styles.forEach(s => s.remove());
+
+              const style = clonedDoc.createElement('style');
+              style.innerHTML = `
+                * {
+                  color: #000000 !important;
+                  border-color: #000000 !important;
+                  background-image: none !important;
+                  text-shadow: none !important;
+                  box-shadow: none !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              `;
+              clonedDoc.head?.appendChild(style);
+            }
+          });
+
+          const dataUrl = canvas.toDataURL('image/png');
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            printWindow.document.write(`
+              <html dir="rtl">
+                <head>
+                  <title>طباعة التذكرة - ${booking.passengerName}</title>
+                  <style>
+                    @media print {
+                      @page { size: auto; margin: 10mm; }
+                      body { margin: 0; padding: 0; background: #ffffff !important; }
+                    }
+                    body {
+                      margin: 0;
+                      padding: 20px;
+                      background: #ffffff;
+                      display: flex;
+                      justify-content: center;
+                      align-items: center;
+                      min-height: 100vh;
+                    }
+                    img {
+                      max-width: 420px;
+                      width: 100%;
+                      height: auto;
+                      display: block;
+                      margin: 0 auto;
+                      image-rendering: -webkit-optimize-contrast;
+                    }
+                  </style>
+                </head>
+                <body>
+                  <img src="${dataUrl}" onload="setTimeout(function(){ window.print(); window.onafterprint = function(){ window.close(); }; }, 300);" />
+                </body>
+              </html>
+            `);
+            printWindow.document.close();
+          }
+        }
+      } catch (error) {
+        console.error('Error printing ticket:', error);
       } finally {
         setDownloadingId(null);
       }
@@ -342,14 +426,24 @@ export default function Profile() {
                            booking.status}
                         </span>
                       </div>
-                      <button 
-                        onClick={() => handleDownloadTicket(booking, trip)}
-                        disabled={downloadingId === booking.id || !trip}
-                        className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                        title="تحميل التذكرة"
-                      >
-                        {downloadingId === booking.id ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handlePrintTicket(booking, trip)}
+                          disabled={downloadingId === booking.id || !trip}
+                          className="p-2 bg-black text-white rounded-xl hover:bg-stone-900 transition-colors disabled:opacity-50"
+                          title="طباعة التذكرة"
+                        >
+                          {downloadingId === booking.id ? <Loader2 className="animate-spin" size={18} /> : <Printer size={18} />}
+                        </button>
+                        <button 
+                          onClick={() => handleDownloadTicket(booking, trip)}
+                          disabled={downloadingId === booking.id || !trip}
+                          className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                          title="تحميل التذكرة"
+                        >
+                          {downloadingId === booking.id ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Hidden Ticket Template for Download */}
@@ -406,8 +500,8 @@ export default function Profile() {
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم الحجز</p><p style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: '900', color: '#000000', margin: 0 }}>{booking.id.slice(0, 8)}</p></div>
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: '900', color: '#000000', margin: 0 }}>{trip.trackingNumber}</p></div>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>الهاتف</p><p style={{ fontWeight: '900', fontSize: '13px', color: '#000000', margin: 0 }}>{booking.passengerPhone}</p></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px' }}>
+                              <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم العميل / الهاتف</p><p style={{ fontWeight: '900', fontSize: '14px', color: '#000000', margin: 0, letterSpacing: '0.5px' }}>{booking.passengerPhone || '---'}</p></div>
                             </div>
                             <div style={{ backgroundColor: '#ffffff', border: '2px solid #000000', padding: '12px 14px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
                               <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>من</p><p style={{ fontWeight: '900', fontSize: '18px', color: '#000000', margin: 0 }}>{trip.from}</p></div>
@@ -433,6 +527,15 @@ export default function Profile() {
                             </div>
                             <div style={{ backgroundColor: '#ffffff', padding: '8px', borderRadius: '8px', border: '1.5px solid #000000', textAlign: 'center' }}>
                               <p style={{ fontSize: '10px', color: '#000000', fontWeight: '900', margin: 0 }}>🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً</p>
+                            </div>
+                            {/* أرقام الفروع */}
+                            <div style={{ backgroundColor: '#ffffff', padding: '7px 8px', borderRadius: '8px', border: '1.5px solid #000000', textAlign: 'center' }}>
+                              <p style={{ fontSize: '9px', color: '#000000', fontWeight: '900', margin: '0 0 3px 0' }}>📞 أرقام فروع العوجان للسياحة</p>
+                              <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', fontSize: '9px', fontWeight: '900', color: '#000000' }}>
+                                <span>الرياض: ٠٥٠٠٠٩٤٢١٠</span>
+                                <span>جدة: ٠٥٣١١٦٠٠٧٩</span>
+                                <span>سوريا: ٠٩٤٣٠١٣١١٣</span>
+                              </div>
                             </div>
                           </div>
                           <div style={{ borderTop: '2.5px dashed #000000', paddingTop: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>

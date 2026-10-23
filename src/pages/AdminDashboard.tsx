@@ -11,7 +11,8 @@ import {
   Plus, Trash2, Edit, Bus as BusIcon, Users, Package, 
   Calendar, Shield, UserCheck, Settings, LayoutDashboard,
   CreditCard, MapPin, Clock, AlertCircle, X, Printer, Download, Search,
-  Image as ImageIcon, DollarSign, Bell, Send, Smartphone, CheckCircle2
+  Image as ImageIcon, DollarSign, Bell, Send, Smartphone, CheckCircle2,
+  ArrowRightLeft, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AdminCities from './AdminCities';
@@ -65,6 +66,10 @@ export default function AdminDashboard() {
     currency: 'SAR', status: 'pending'
   });
   const [parcelSearch, setParcelSearch] = useState('');
+  const [transferParcel, setTransferParcel] = useState<Parcel | null>(null);
+  const [targetTripId, setTargetTripId] = useState<string>('');
+  const [updateRouteWithTrip, setUpdateRouteWithTrip] = useState<boolean>(false);
+  const [isTransferringParcel, setIsTransferringParcel] = useState<boolean>(false);
   const [newNotification, setNewNotification] = useState<Partial<Notification>>({
     title: '', body: '', type: 'all', targetId: '', deliveryMethod: 'both', imageUrl: ''
   });
@@ -203,10 +208,271 @@ export default function AdminDashboard() {
     }
   };
 
-  const handlePrintTicket = async (booking: Booking, trip: Trip) => {
+  const renderBookingTicket = (booking: Booking, tripObj: Trip | undefined, hidePrice: boolean) => {
+    const priceInfo = tripObj ? getBookingPrice(booking, tripObj) : { value: 0, currency: '' };
+    const extra = booking.extraParcelsPrice || 0;
+    const total = priceInfo.value + extra;
+    const idAttr = hidePrice ? `print-ticket-noprice-${booking.id}` : `print-ticket-${booking.id}`;
+
+    return (
+      <div 
+        key={idAttr}
+        id={idAttr}
+        style={{ 
+          display: 'none', 
+          width: '800px', 
+          minHeight: '300px',
+          height: 'auto',
+          backgroundColor: '#ffffff',
+          fontFamily: 'Arial, sans-serif',
+          position: 'fixed',
+          left: '-9999px'
+        }}
+      >
+        <div style={{ 
+          display: 'flex', 
+          height: '100%', 
+          border: '2.5px solid #000000',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          direction: 'rtl',
+          boxSizing: 'border-box',
+          backgroundColor: '#ffffff'
+        }}>
+          {/* Main Part */}
+          <div style={{ 
+            flex: 3, 
+            padding: '20px', 
+            position: 'relative', 
+            borderLeft: '2.5px dashed #000000', 
+            textAlign: 'right',
+            boxSizing: 'border-box',
+            backgroundColor: '#ffffff'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              marginBottom: '16px', 
+              alignItems: 'flex-start' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <img 
+                  src="/logoaujantravel.jpeg" 
+                  alt="Logo" 
+                  referrerPolicy="no-referrer"
+                  style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '50%', border: '2px solid #000000' }} 
+                />
+                <div>
+                  <h2 style={{ margin: 0, color: '#000000', fontSize: '22px', fontWeight: '900' }}>العوجان للسياحة</h2>
+                  <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold', letterSpacing: '0.5px' }}>INTERNATIONAL BOARDING PASS</p>
+                </div>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#000000' }}>رقم التتبع: {tripObj?.trackingNumber || '---'}</p>
+                <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>CONFIRMED / مؤكد</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '14px' }}>
+              <div style={{ flex: 1.2 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>اسم المسافر</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '15px', color: '#000000' }}>{booking.passengerName}</p>
+              </div>
+              <div style={{ flex: 1.1 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم العميل / الهاتف</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', color: '#000000', direction: 'ltr', textAlign: 'right' }}>{booking.passengerPhone || '---'}</p>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الجواز</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', color: '#000000' }}>{booking.passportNumber || '---'}</p>
+              </div>
+              <div style={{ flex: 0.9 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الحجز</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', fontFamily: 'monospace', color: '#000000' }}>{booking.id.slice(0, 8)}</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '20px', 
+              margin: '12px 0', 
+              backgroundColor: '#ffffff', 
+              border: '2px solid #000000', 
+              padding: '10px 14px', 
+              borderRadius: '8px', 
+              boxSizing: 'border-box' 
+            }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>من</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.from || tripObj?.from}</p>
+              </div>
+              <div style={{ color: '#000000', fontSize: '24px', fontWeight: '900' }}>←</div>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.to || tripObj?.to}</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '20px', marginTop: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{tripObj?.date}</p>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>الوقت</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{tripObj?.time}</p>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '20px', color: '#000000' }}>{booking.seatNumber}</p>
+              </div>
+              {!hidePrice ? (
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>سعر التذكرة</p>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>{total} {priceInfo.currency}</p>
+                  {extra > 0 && (
+                    <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>
+                      (يشمل {booking.extraParcelsCount} طرود: +{extra} {priceInfo.currency})
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>حالة التذكرة</p>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>مؤكدة</p>
+                  {booking.extraParcelsCount ? (
+                    <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>
+                      (طرود إضافية: {booking.extraParcelsCount})
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            {/* أرقام فروع العوجان للسياحة */}
+            <div style={{ 
+              marginTop: '12px', 
+              padding: '8px 12px', 
+              border: '2px solid #000000', 
+              borderRadius: '8px', 
+              backgroundColor: '#ffffff',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center'
+              }}>
+                <div style={{ fontSize: '11px', fontWeight: '900', color: '#000000' }}>
+                  📞 أرقام الفروع:
+                </div>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#000000', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontWeight: '900' }}>الرياض:</span>
+                    <span style={{ fontWeight: '900' }}>٠٥٠٠٠٩٤٢١٠</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#000000', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontWeight: '900' }}>جدة:</span>
+                    <span style={{ fontWeight: '900' }}>٠٥٣١١٦٠٠٧٩</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#000000', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontWeight: '900' }}>سوريا:</span>
+                    <span style={{ fontWeight: '900' }}>٠٩٤٣٠١٣١١٣</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stub Part */}
+          <div style={{ 
+            flex: 1, 
+            padding: '16px', 
+            backgroundColor: '#ffffff', 
+            textAlign: 'right',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '1.5px solid #000000', paddingBottom: '6px' }}>
+              <p style={{ margin: 0, fontSize: '11px', fontWeight: '900', color: '#000000' }}>بطاقة صعود</p>
+              <p style={{ margin: 0, fontSize: '9px', color: '#000000', fontWeight: 'bold' }}>نسخة المسافر</p>
+            </div>
+            <div style={{ marginBottom: '6px' }}>
+              <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>الاسم</p>
+              <p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.passengerName}</p>
+            </div>
+            <div style={{ marginBottom: '6px' }}>
+              <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>رقم العميل</p>
+              <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.passengerPhone || '---'}</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>من</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.from || tripObj?.from}</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.to || tripObj?.to}</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{tripObj?.date}</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{booking.seatNumber}</p>
+              </div>
+              {!hidePrice ? (
+                <div>
+                  <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>السعر</p>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>
+                    {total} {priceInfo.currency}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>الحالة</p>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>
+                    مؤكد
+                  </p>
+                </div>
+              )}
+            </div>
+            {/* أرقام الفروع على قسيمة الراكب */}
+            <div style={{ 
+              marginTop: '6px', 
+              padding: '5px 4px', 
+              border: '1.5px solid #000000', 
+              borderRadius: '6px', 
+              textAlign: 'center',
+              backgroundColor: '#ffffff'
+            }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '8px', fontWeight: '900', color: '#000000' }}>أرقام الفروع</p>
+              <p style={{ margin: '1px 0', fontSize: '7.5px', fontWeight: '900', color: '#000000' }}>الرياض: ٠٥٠٠٠٩٤٢١٠</p>
+              <p style={{ margin: '1px 0', fontSize: '7.5px', fontWeight: '900', color: '#000000' }}>جدة: ٠٥٣١١٦٠٠٧٩</p>
+              <p style={{ margin: '1px 0', fontSize: '7.5px', fontWeight: '900', color: '#000000' }}>سوريا: ٠٩٤٣٠١٣١١٣</p>
+            </div>
+            <div style={{ marginTop: '8px', textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2px', height: '24px', padding: '2px 0' }}>
+                {[4,2,3,1,4,2,1,3,2,4,1,2,3,2,1,4,3,1,2,4,2,1,3,2,4,1,3].map((w, bi) => (
+                  <div key={bi} style={{ width: `${w}px`, height: '100%', backgroundColor: '#000000' }} />
+                ))}
+              </div>
+              <p style={{ margin: '3px 0 0 0', fontSize: '8px', fontFamily: 'monospace', color: '#000000', fontWeight: '900' }}>{booking.id.slice(0, 10).toUpperCase()}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const handlePrintTicket = async (booking: Booking, trip: Trip, hidePrice: boolean = false) => {
     setIsPrinting(true);
     try {
-      const element = document.getElementById(`print-ticket-${booking.id}`);
+      const elementId = hidePrice ? `print-ticket-noprice-${booking.id}` : `print-ticket-${booking.id}`;
+      const element = document.getElementById(elementId);
       if (!element || !element.style) return;
       
       const originalDisplay = element.style.display;
@@ -245,7 +511,7 @@ export default function AdminDashboard() {
         printWindow.document.write(`
           <html dir="rtl">
             <head>
-              <title>طباعة تذكرة - ${booking.passengerName}</title>
+              <title>طباعة تذكرة ${hidePrice ? '(بدون سعر) ' : ''}- ${booking.passengerName}</title>
               <style>
                 @media print {
                   @page { size: auto; margin: 8mm; }
@@ -280,7 +546,7 @@ export default function AdminDashboard() {
       }
 
       const link = document.createElement('a');
-      link.download = `ticket-${booking.passengerName}-${booking.id.slice(0, 8)}.png`;
+      link.download = `ticket-${booking.passengerName}-${booking.id.slice(0, 8)}${hidePrice ? '-noprice' : ''}.png`;
       link.href = imgData;
       link.click();
     } catch (err) {
@@ -644,6 +910,9 @@ export default function AdminDashboard() {
             إجمالي SYP: ${tripParcels.filter(p => p.currency === 'SYP').reduce((acc, p) => acc + (p.price || 0), 0).toLocaleString('ar-EG')} ل.س
           </div>
           <div class="footer">
+            <div style="margin-bottom: 6px; font-weight: 900; font-size: 13px; color: #000000;">
+              أرقام فروع الشحن: الرياض: ٠٥٠٠٠٩٤٢١٠ | جدة: ٠٥٣١١٦٠٠٧٩ | سوريا: ٠٩٨٩٨٨٩٠٩٢
+            </div>
             تم استخراج هذا الكشف بتاريخ ${new Date().toLocaleString('ar-EG')}
           </div>
           <script>
@@ -932,6 +1201,39 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleTransferParcelTrip = async () => {
+    if (!transferParcel) return;
+    try {
+      setIsTransferringParcel(true);
+      setError(null);
+
+      const destTrip = trips.find(t => t.id === targetTripId);
+      const updateData: any = {
+        tripId: targetTripId ? targetTripId : null,
+      };
+
+      if (destTrip) {
+        updateData.trackingNumber = destTrip.trackingNumber || '';
+        if (updateRouteWithTrip) {
+          updateData.from = destTrip.from;
+          updateData.to = destTrip.to;
+        }
+      }
+
+      // Preserve existing waybillNumber completely without any modification
+      await updateDoc(doc(db, 'parcels', transferParcel.id), updateData);
+
+      setSuccess(`تم نقل الشحنة (بوليصة رقم ${transferParcel.waybillNumber}) بنجاح ${destTrip ? `إلى رحلة ${destTrip.from} ➔ ${destTrip.to}` : 'إلى الشحنات العامة'}`);
+      setTimeout(() => setSuccess(null), 5000);
+      setTransferParcel(null);
+    } catch (err: any) {
+      console.error('Error transferring parcel:', err);
+      setError('حدث خطأ أثناء نقل الشحنة: ' + (err.message || ''));
+    } finally {
+      setIsTransferringParcel(false);
+    }
+  };
+
   const handleSendNotification = async () => {
     if (!newNotification.title || !newNotification.body) return;
     
@@ -1153,7 +1455,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handlePrintParcelInvoice = (parcel: Parcel) => {
+  const handlePrintParcelInvoice = (parcel: Parcel, hidePrice: boolean = false) => {
     const trip = trips.find(t => t.id === parcel.tripId);
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -1161,39 +1463,49 @@ export default function AdminDashboard() {
     const html = `
       <html dir="rtl">
         <head>
-          <title>فاتورة شحن طرد - ${parcel.waybillNumber}</title>
+          <title>تذكرة شحن طرد ${hidePrice ? '(بدون سعر) ' : ''}- ${parcel.waybillNumber}</title>
           <style>
+            * {
+              color: #000000 !important;
+            }
             @page {
               size: A4 portrait;
               margin: 8mm;
             }
             body { font-family: 'Arial', sans-serif; padding: 15px; color: #000000; background: #fff; margin: 0; }
-            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 1.5px solid #000000; box-shadow: none; font-size: 14px; line-height: 1.4; border-radius: 8px; color: #000000; }
+            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 2px solid #000000; box-shadow: none; font-size: 14px; line-height: 1.4; border-radius: 8px; color: #000000; }
             .header { border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; color: #000000; }
             .company-info h1 { margin: 0; color: #000000; font-size: 20px; font-weight: 900; }
-            .company-info p { margin: 2px 0 0 0; font-size: 13px; color: #000000; font-weight: bold; }
+            .company-info p { margin: 2px 0 0 0; font-size: 13px; color: #000000; font-weight: 900; }
             .tracking p { margin: 2px 0; font-size: 13px; color: #000000; }
             .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; color: #000000; }
-            .section-title { font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px; }
-            .info-row { margin-bottom: 4px; font-size: 12px; color: #000000; }
+            .section-title { font-weight: 900; color: #000000; border-bottom: 2px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px; }
+            .info-row { margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold; }
             .info-label { font-weight: 900; color: #000000; }
             .price-section { margin-top: 15px; padding: 12px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; text-align: left; display: flex; justify-content: space-between; align-items: center; color: #000000; }
             .price-section .info-label { font-size: 13px; margin: 0; font-weight: 900; color: #000000; }
             .total-price { font-size: 18px; font-weight: 900; color: #000000; margin: 0; }
-            .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #000000; border-top: 1.5px solid #000000; padding-top: 10px; font-weight: bold; }
+            .branches-section { margin-top: 15px; padding: 10px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; color: #000000; }
+            .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #000000; border-top: 2px solid #000000; padding-top: 10px; font-weight: bold; }
             @media print {
+              * {
+                color: #000000 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
               .no-print { display: none; }
-              body { padding: 0; margin: 0; }
-              .invoice-box { padding: 10px; border: none; box-shadow: none; max-width: 100%; }
+              body { padding: 0; margin: 0; color: #000000 !important; }
+              .invoice-box { padding: 10px; border: 2px solid #000000; box-shadow: none; max-width: 100%; }
               @page {
                 size: A4 portrait;
                 margin: 5mm;
               }
-              .terms-section { font-size: 9px !important; line-height: 1.4 !important; padding: 6px !important; margin-top: 10px !important; }
-              .price-section { padding: 8px 12px; margin-top: 10px; }
+              .terms-section { font-size: 9px !important; line-height: 1.4 !important; padding: 6px !important; margin-top: 10px !important; border: 1.5px solid #000000 !important; }
+              .price-section { padding: 8px 12px; margin-top: 10px; border: 2px solid #000000 !important; }
+              .branches-section { padding: 8px 12px; margin-top: 10px; border: 2px solid #000000 !important; }
               .invoice-details { margin-bottom: 8px; gap: 10px; }
-              .header { margin-bottom: 8px; padding-bottom: 6px; }
-              .footer { margin-top: 8px; padding-top: 6px; }
+              .header { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #000000 !important; }
+              .footer { margin-top: 8px; padding-top: 6px; border-top: 2px solid #000000 !important; }
             }
           </style>
         </head>
@@ -1204,16 +1516,16 @@ export default function AdminDashboard() {
                 <img 
                   src="/logoaujantravel.jpeg" 
                   crossorigin="anonymous"
-                  style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+                  style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1.5px solid #000000;"
                 />
                 <div>
                   <h1>العوجان للسياحة والسفر</h1>
-                  <p>خدمات شحن الطرود</p>
+                  <p>خدمات شحن الطرود - تذكرة الشحن</p>
                 </div>
               </div>
               <div class="tracking">
                 <p><strong>رقم بوليصة الشحن:</strong> ${parcel.waybillNumber}</p>
-                <p><strong>رقم تتبع الرحلة:</strong> <span style="color: #059669; font-weight: bold;">${trip?.trackingNumber || '---'}</span></p>
+                <p><strong>رقم تتبع الرحلة:</strong> <span style="color: #000000; font-weight: 900;">${trip?.trackingNumber || '---'}</span></p>
                 <p><strong>التاريخ:</strong> ${new Date(parcel.createdAt).toLocaleDateString('ar-EG')}</p>
               </div>
             </div>
@@ -1244,12 +1556,33 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            ${!hidePrice ? `
             <div class="price-section">
               <span class="info-label">إجمالي تكلفة الشحن:</span>
               <div class="total-price">${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}</div>
             </div>
+            ` : `
+            <div class="price-section" style="background: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;">
+              <span class="info-label">حالة الشحنة:</span>
+              <div class="total-price" style="font-size: 15px;">${parcel.status === 'pending' ? 'قيد الانتظار' : parcel.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</div>
+            </div>
+            `}
 
-            <div class="terms-section" style="margin-top: 25px; border: 1.5px solid #000000; border-radius: 8px; padding: 15px; background: #ffffff; font-size: 11px; color: #000000; line-height: 1.8; text-align: right;">
+            <!-- أرقام فروع الشحن -->
+            <div class="branches-section">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="font-weight: 900; font-size: 13px; color: #000000;">
+                  📞 أرقام فروع الشحن:
+                </div>
+                <div style="display: flex; gap: 20px; align-items: center; font-size: 13px; font-weight: 900; color: #000000;">
+                  <span>الرياض: ٠٥٠٠٠٩٤٢١٠</span>
+                  <span>جدة: ٠٥٣١١٦٠٠٧٩</span>
+                  <span>سوريا: ٠٩٨٩٨٨٩٠٩٢</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="terms-section" style="margin-top: 20px; border: 1.5px solid #000000; border-radius: 8px; padding: 15px; background: #ffffff; font-size: 11px; color: #000000; line-height: 1.8; text-align: right;">
               <div style="font-size: 13px; font-weight: 900; color: #000000; margin-bottom: 8px; border-bottom: 2px solid #000000; padding-bottom: 4px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
               <ul style="padding-right: 15px; margin: 0; list-style-type: none; color: #000000;">
                 <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
@@ -1280,8 +1613,11 @@ export default function AdminDashboard() {
             </div>
 
             <div class="footer">
-              <p>شكراً لتعاملكم معنا. يرجى الاحتفاظ بهذه الفاتورة لتتبع شحنتكم.</p>
-              <p>هذه الوثيقة صدرت إلكترونياً ولا تحتاج لختم.</p>
+              <div style="margin-bottom: 6px; font-size: 12px; font-weight: 900; color: #000000;">
+                أرقام فروع الشحن: الرياض: ٠٥٠٠٠٩٤٢١٠ | جدة: ٠٥٣١١٦٠٠٧٩ | سوريا: ٠٩٨٩٨٨٩٠٩٢
+              </div>
+              <p style="margin: 3px 0; color: #000000;">شكراً لتعاملكم معنا. يرجى الاحتفاظ بهذه التذكرة لتتبع شحنتكم.</p>
+              <p style="margin: 3px 0; color: #000000;">هذه الوثيقة صدرت إلكترونياً ولا تحتاج لختم.</p>
             </div>
           </div>
           <script>
@@ -1820,6 +2156,148 @@ export default function AdminDashboard() {
                   </button>
                   <button 
                     onClick={() => setDirectNotificationBooking(null)} 
+                    className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors text-sm"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* Transfer Parcel Modal */}
+          {transferParcel && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl text-right space-y-5"
+              >
+                <div className="flex justify-between items-center pb-3 border-b border-stone-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <ArrowRightLeft size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-stone-800">نقل الشحنة إلى رحلة أخرى</h3>
+                      <p className="text-xs text-stone-500">تغيير رحلة الشحنة مع الاحتفاظ بنفس رقم بوليصة الشحن</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setTransferParcel(null)}
+                    className="p-1.5 hover:bg-stone-100 rounded-full text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Waybill number highlight badge */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold text-emerald-800">رقم بوليصة الشحن (ثابت ولن يتغير):</span>
+                    <p className="text-xs text-emerald-600">سيتم نقل الشحنة دون المساس برقم بوليصة الشحن إطلاقاً</p>
+                  </div>
+                  <span className="bg-white px-3 py-1.5 rounded-xl border border-emerald-200 font-mono font-black text-emerald-700 text-base shadow-sm">
+                    {transferParcel.waybillNumber}
+                  </span>
+                </div>
+
+                {/* Parcel current info */}
+                <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 text-xs text-stone-700 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <p><strong className="text-stone-400">المرسل:</strong> {transferParcel.senderName} ({transferParcel.senderPhone})</p>
+                    <p><strong className="text-stone-400">المستلم:</strong> {transferParcel.receiverName} ({transferParcel.receiverPhone})</p>
+                  </div>
+                  <div className="border-t border-stone-200/60 pt-2 grid grid-cols-2 gap-2">
+                    <p><strong className="text-stone-400">المسار الحالي:</strong> <span className="font-bold text-stone-800">{transferParcel.from} ➔ {transferParcel.to}</span></p>
+                    <p>
+                      <strong className="text-stone-400">الرحلة الحالية:</strong>{' '}
+                      {(() => {
+                        const currentTrip = trips.find(t => t.id === transferParcel.tripId);
+                        return currentTrip ? (
+                          <span className="font-bold text-stone-800">{currentTrip.from} ➔ {currentTrip.to} ({currentTrip.trackingNumber})</span>
+                        ) : (
+                          <span className="text-stone-500 font-medium">شحنة عامة (غير مرتبطة برحلة)</span>
+                        );
+                      })()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Select target trip */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1.5">
+                      اختر الرحلة الجديدة المراد النقل إليها:
+                    </label>
+                    <select 
+                      value={targetTripId} 
+                      onChange={e => {
+                        setTargetTripId(e.target.value);
+                      }}
+                      className="w-full bg-stone-100 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 text-right font-sans"
+                    >
+                      <option value="">📦 بدون رحلة (تحويل إلى شحنة عامة مستقلة)</option>
+                      
+                      {trips.filter(t => t.status === 'active' || t.status === 'scheduled').length > 0 && (
+                        <optgroup label="الرحلات النشطة والمجدولة">
+                          {trips
+                            .filter(t => t.status === 'active' || t.status === 'scheduled')
+                            .map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.from} ➔ {t.to} ({formatDateArabic(t.date)} - {t.time}) - {t.trackingNumber}
+                              </option>
+                            ))
+                          }
+                        </optgroup>
+                      )}
+
+                      {trips.filter(t => t.status !== 'active' && t.status !== 'scheduled').length > 0 && (
+                        <optgroup label="رحلات أخرى">
+                          {trips
+                            .filter(t => t.status !== 'active' && t.status !== 'scheduled')
+                            .map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.from} ➔ {t.to} ({formatDateArabic(t.date)} - {t.time}) - {t.trackingNumber} ({t.status})
+                              </option>
+                            ))
+                          }
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+
+                  {targetTripId && (
+                    <label className="flex items-center gap-2 p-3 bg-blue-50/70 border border-blue-100 rounded-xl cursor-pointer hover:bg-blue-50 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={updateRouteWithTrip} 
+                        onChange={e => setUpdateRouteWithTrip(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 accent-blue-600"
+                      />
+                      <span className="text-xs font-bold text-blue-900">
+                        تحديث مسار الشحنة ليتطابق مع مسار الرحلة الجديدة 
+                        {(() => {
+                          const targetT = trips.find(t => t.id === targetTripId);
+                          return targetT ? ` (${targetT.from} ➔ ${targetT.to})` : '';
+                        })()}
+                      </span>
+                    </label>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-3 border-t border-stone-100">
+                  <button 
+                    onClick={handleTransferParcelTrip} 
+                    disabled={isTransferringParcel}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-stone-200 disabled:text-stone-400 transition-colors flex items-center justify-center gap-2 text-sm shadow-md shadow-blue-500/20"
+                  >
+                    <ArrowRightLeft size={16} />
+                    {isTransferringParcel ? 'جاري النقل...' : 'تأكيد نقل الشحنة'}
+                  </button>
+                  <button 
+                    onClick={() => setTransferParcel(null)} 
+                    disabled={isTransferringParcel}
                     className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors text-sm"
                   >
                     إلغاء
@@ -2896,11 +3374,18 @@ export default function AdminDashboard() {
                                 ) : (
                                   <>
                                     <button 
-                                      onClick={() => handlePrintTicket(booking, trips.find(t => t.id === booking.tripId)!)}
+                                      onClick={() => handlePrintTicket(booking, trips.find(t => t.id === booking.tripId)!, false)}
                                       className="text-emerald-600 p-2 hover:bg-emerald-50 rounded-lg"
-                                      title="طباعة التذكرة"
+                                      title="طباعة التذكرة (مع السعر)"
                                     >
                                       <Printer size={16} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handlePrintTicket(booking, trips.find(t => t.id === booking.tripId)!, true)}
+                                      className="text-blue-600 p-2 hover:bg-blue-50 rounded-lg flex items-center justify-center"
+                                      title="طباعة التذكرة بدون سعر (البيانات فقط)"
+                                    >
+                                      <FileText size={16} />
                                     </button>
                                     <button 
                                       onClick={() => {
@@ -2931,193 +3416,9 @@ export default function AdminDashboard() {
                                 )}
                               </div>
 
-                              {/* Hidden Flight Ticket Template */}
-                              <div 
-                                id={`print-ticket-${booking.id}`}
-                                style={{ 
-                                  display: 'none', 
-                                  width: '800px', 
-                                  height: '300px', 
-                                  backgroundColor: '#ffffff',
-                                  fontFamily: 'Arial, sans-serif',
-                                  position: 'fixed',
-                                  left: '-9999px'
-                                }}
-                              >
-                                <div style={{ 
-                                  display: 'flex', 
-                                  height: '100%', 
-                                  border: '2.5px solid #000000',
-                                  borderRadius: '12px',
-                                  overflow: 'hidden',
-                                  direction: 'rtl',
-                                  boxSizing: 'border-box',
-                                  backgroundColor: '#ffffff'
-                                }}>
-                                  {/* Main Part */}
-                                  <div style={{ 
-                                    flex: 3, 
-                                    padding: '20px', 
-                                    position: 'relative', 
-                                    borderLeft: '2.5px dashed #000000', 
-                                    textAlign: 'right',
-                                    boxSizing: 'border-box',
-                                    backgroundColor: '#ffffff'
-                                  }}>
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      justifyContent: 'space-between', 
-                                      marginBottom: '16px', 
-                                      alignItems: 'flex-start' 
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <img 
-                                          src="/logoaujantravel.jpeg" 
-                                          alt="Logo" 
-                                          referrerPolicy="no-referrer"
-                                          style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '50%', border: '2px solid #000000' }} 
-                                        />
-                                        <div>
-                                          <h2 style={{ margin: 0, color: '#000000', fontSize: '22px', fontWeight: '900' }}>العوجان للسياحة</h2>
-                                          <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold', letterSpacing: '0.5px' }}>INTERNATIONAL BOARDING PASS</p>
-                                        </div>
-                                      </div>
-                                      <div style={{ textAlign: 'left' }}>
-                                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#000000' }}>رقم التتبع: {trips.find(t => t.id === booking.tripId)?.trackingNumber}</p>
-                                        <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>CONFIRMED / مؤكد</p>
-                                      </div>
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: '20px', marginBottom: '14px' }}>
-                                      <div style={{ flex: 1.2 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>اسم المسافر</p>
-                                        <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '15px', color: '#000000' }}>{booking.passengerName}</p>
-                                      </div>
-                                      <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الجواز</p>
-                                        <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', color: '#000000' }}>{booking.passportNumber || '---'}</p>
-                                      </div>
-                                      <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الحجز</p>
-                                        <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', fontFamily: 'monospace', color: '#000000' }}>{booking.id.slice(0, 8)}</p>
-                                      </div>
-                                    </div>
-
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      gap: '20px', 
-                                      margin: '12px 0', 
-                                      backgroundColor: '#ffffff', 
-                                      border: '2px solid #000000',
-                                      padding: '10px 14px', 
-                                      borderRadius: '8px',
-                                      boxSizing: 'border-box'
-                                    }}>
-                                      <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>من</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
-                                      </div>
-                                      <div style={{ color: '#000000', fontSize: '24px', fontWeight: '900' }}>←</div>
-                                      <div style={{ flex: 1, textAlign: 'left' }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
-                                      </div>
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: '20px', marginTop: '12px' }}>
-                                      <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{trips.find(t => t.id === booking.tripId)?.date}</p>
-                                      </div>
-                                      <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>الوقت</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{trips.find(t => t.id === booking.tripId)?.time}</p>
-                                      </div>
-                                      <div style={{ flex: 1 }}>
-                                        <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '20px', color: '#000000' }}>{booking.seatNumber}</p>
-                                      </div>
-                                      {(() => {
-                                        const tripObj = trips.find(t => t.id === booking.tripId);
-                                        const priceInfo = tripObj ? getBookingPrice(booking, tripObj) : { value: 0, currency: '' };
-                                        const extra = booking.extraParcelsPrice || 0;
-                                        const total = priceInfo.value + extra;
-                                        return (
-                                          <div style={{ flex: 1 }}>
-                                            <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>سعر التذكرة</p>
-                                            <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>{total} {priceInfo.currency}</p>
-                                            {extra > 0 && (
-                                              <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>
-                                                (يشمل {booking.extraParcelsCount} طرود: +{extra} {priceInfo.currency})
-                                              </p>
-                                            )}
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  </div>
-
-                                  {/* Stub Part */}
-                                  <div style={{ 
-                                    flex: 1, 
-                                    padding: '16px', 
-                                    backgroundColor: '#ffffff', 
-                                    textAlign: 'right',
-                                    boxSizing: 'border-box'
-                                  }}>
-                                    <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '1.5px solid #000000', paddingBottom: '6px' }}>
-                                      <p style={{ margin: 0, fontSize: '11px', fontWeight: '900', color: '#000000' }}>بطاقة صعود</p>
-                                      <p style={{ margin: 0, fontSize: '9px', color: '#000000', fontWeight: 'bold' }}>نسخة المسافر</p>
-                                    </div>
-                                    <div style={{ marginBottom: '8px' }}>
-                                      <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>الاسم</p>
-                                      <p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: '#000000' }}>{booking.passengerName}</p>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                      <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>من</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.from || trips.find(t => t.id === booking.tripId)?.from}</p>
-                                      </div>
-                                      <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.to || trips.find(t => t.id === booking.tripId)?.to}</p>
-                                      </div>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                      <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{trips.find(t => t.id === booking.tripId)?.date}</p>
-                                      </div>
-                                      <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
-                                        <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{booking.seatNumber}</p>
-                                      </div>
-                                      <div>
-                                        <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>السعر</p>
-                                        {(() => {
-                                          const tripObj = trips.find(t => t.id === booking.tripId);
-                                          const priceInfo = tripObj ? getBookingPrice(booking, tripObj) : { value: 0, currency: '' };
-                                          const extra = booking.extraParcelsPrice || 0;
-                                          return (
-                                            <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>
-                                              {priceInfo.value + extra} {priceInfo.currency}
-                                            </p>
-                                          );
-                                        })()}
-                                      </div>
-                                    </div>
-                                    <div style={{ marginTop: '12px', textAlign: 'center' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2px', height: '26px', padding: '2px 0' }}>
-                                        {[4,2,3,1,4,2,1,3,2,4,1,2,3,2,1,4,3,1,2,4,2,1,3,2,4,1,3].map((w, bi) => (
-                                          <div key={bi} style={{ width: `${w}px`, height: '100%', backgroundColor: '#000000' }} />
-                                        ))}
-                                      </div>
-                                      <p style={{ margin: '3px 0 0 0', fontSize: '8px', fontFamily: 'monospace', color: '#000000', fontWeight: '900' }}>{booking.id.slice(0, 10).toUpperCase()}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                              {/* Flight Ticket Templates (With Price & Without Price) */}
+                              {renderBookingTicket(booking, trips.find(t => t.id === booking.tripId), false)}
+                              {renderBookingTicket(booking, trips.find(t => t.id === booking.tripId), true)}
                             </td>
                           </tr>
                         ))}
@@ -3517,11 +3818,29 @@ export default function AdminDashboard() {
                               <td className="p-4">
                                 <div className="flex items-center gap-2">
                                   <button 
-                                    onClick={() => handlePrintParcelInvoice(parcel)}
+                                    onClick={() => {
+                                      setTransferParcel(parcel);
+                                      setTargetTripId(parcel.tripId || '');
+                                      setUpdateRouteWithTrip(false);
+                                    }}
+                                    className="p-2 text-stone-400 hover:text-blue-600 transition-colors"
+                                    title="تغيير الرحلة (نقل الشحنة مع بقاء رقم البوليصة)"
+                                  >
+                                    <ArrowRightLeft size={18} />
+                                  </button>
+                                  <button 
+                                    onClick={() => handlePrintParcelInvoice(parcel, false)}
                                     className="p-2 text-stone-400 hover:text-emerald-600 transition-colors"
-                                    title="طباعة الفاتورة"
+                                    title="طباعة تذكرة الشحن (مع السعر)"
                                   >
                                     <Printer size={18} />
+                                  </button>
+                                  <button 
+                                    onClick={() => handlePrintParcelInvoice(parcel, true)}
+                                    className="p-2 text-stone-400 hover:text-blue-600 transition-colors"
+                                    title="طباعة تذكرة الشحن بدون سعر (البيانات فقط)"
+                                  >
+                                    <FileText size={18} />
                                   </button>
                                   <button 
                                     onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)}
@@ -3589,10 +3908,32 @@ export default function AdminDashboard() {
                                 </td>
                                 <td className="p-4">
                                   <div className="flex items-center gap-2">
-                                    <button onClick={() => handlePrintParcelInvoice(parcel)} className="p-2 text-stone-400 hover:text-emerald-600">
+                                    <button 
+                                      onClick={() => {
+                                        setTransferParcel(parcel);
+                                        setTargetTripId(parcel.tripId || '');
+                                        setUpdateRouteWithTrip(false);
+                                      }}
+                                      className="p-2 text-stone-400 hover:text-blue-600 transition-colors"
+                                      title="ربط برحلة أو نقل الشحنة مع بقاء رقم البوليصة"
+                                    >
+                                      <ArrowRightLeft size={18} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handlePrintParcelInvoice(parcel, false)} 
+                                      className="p-2 text-stone-400 hover:text-emerald-600 transition-colors"
+                                      title="طباعة تذكرة الشحن (مع السعر)"
+                                    >
                                       <Printer size={18} />
                                     </button>
-                                    <button onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)} className="p-2 text-stone-400 hover:text-red-500">
+                                    <button 
+                                      onClick={() => handlePrintParcelInvoice(parcel, true)} 
+                                      className="p-2 text-stone-400 hover:text-blue-600 transition-colors"
+                                      title="طباعة تذكرة الشحن بدون سعر (البيانات فقط)"
+                                    >
+                                      <FileText size={18} />
+                                    </button>
+                                    <button onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)} className="p-2 text-stone-400 hover:text-red-500" title="حذف">
                                       <Trash2 size={18} />
                                     </button>
                                   </div>
