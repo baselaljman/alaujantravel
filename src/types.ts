@@ -75,6 +75,7 @@ export interface Booking {
   to?: string;
   extraParcelsCount?: number;
   extraParcelsPrice?: number;
+  isFree?: boolean;
 }
 
 export interface Parcel {

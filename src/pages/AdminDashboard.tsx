@@ -146,10 +146,11 @@ export default function AdminDashboard() {
     passengerName: '',
     passengerPhone: '',
     passportNumber: '',
-    seatNumber: 0,
+    seatNumber: '' as number | string,
     paymentMethod: 'later',
     status: 'confirmed',
-    to: ''
+    to: '',
+    isFree: false
   });
 
   useEffect(() => {
@@ -188,6 +189,11 @@ export default function AdminDashboard() {
     const fromCityName = booking.from || trip.from;
     const fromCity = cities.find(c => c.name === fromCityName);
     const isSyrianCurrency = fromCity?.country === 'سوريا';
+    const defaultCurrency = isSyrianCurrency ? 'ل.س' : 'ريال';
+
+    if (booking.isFree) {
+      return { value: 0, currency: defaultCurrency, isFree: true };
+    }
 
     const bookingTo = booking.to || trip.to;
     if (bookingTo !== trip.to && trip.stops) {
@@ -325,12 +331,16 @@ export default function AdminDashboard() {
               </div>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '20px', color: '#000000' }}>{booking.seatNumber}</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: booking.seatNumber && booking.seatNumber > 0 ? '20px' : '15px', color: '#000000' }}>
+                  {booking.seatNumber && booking.seatNumber > 0 ? booking.seatNumber : 'بدون تحديد'}
+                </p>
               </div>
               {!hidePrice ? (
                 <div style={{ flex: 1 }}>
                   <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>سعر التذكرة</p>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>{total} {priceInfo.currency}</p>
+                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>
+                    {booking.isFree ? 'مجاني (0)' : `${total} ${priceInfo.currency}`}
+                  </p>
                   {extra > 0 && (
                     <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>
                       (يشمل {booking.extraParcelsCount} طرود: +{extra} {priceInfo.currency})
@@ -422,13 +432,15 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{booking.seatNumber}</p>
+                <p style={{ margin: 0, fontWeight: '900', fontSize: booking.seatNumber && booking.seatNumber > 0 ? '13px' : '9px', color: '#000000' }}>
+                  {booking.seatNumber && booking.seatNumber > 0 ? booking.seatNumber : 'بدون تحديد'}
+                </p>
               </div>
               {!hidePrice ? (
                 <div>
                   <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>السعر</p>
                   <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>
-                    {total} {priceInfo.currency}
+                    {booking.isFree ? 'مجاني' : `${total} ${priceInfo.currency}`}
                   </p>
                 </div>
               ) : (
@@ -628,10 +640,10 @@ export default function AdminDashboard() {
                   ${chunk.map((b, i) => `
                     <tr>
                       <td>${chunkIndex * chunkSize + i + 1}</td>
-                      <td>${b.passengerName}</td>
+                      <td>${b.passengerName} ${b.isFree ? '<span style="color: #2563eb; font-weight: bold;">(مجاني)</span>' : ''}</td>
                       <td>${b.passengerPhone}</td>
                       <td>${b.passportNumber || '---'}</td>
-                      <td>${b.seatNumber}</td>
+                      <td>${b.seatNumber && b.seatNumber > 0 ? b.seatNumber : 'بدون تحديد'}</td>
                       <td>${b.to || trip.to}</td>
                       <td>${b.extraParcelsCount ? `${b.extraParcelsCount} طرود` : '---'}</td>
                       <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
@@ -687,7 +699,7 @@ export default function AdminDashboard() {
     const bookingPrices = tripBookings.map(b => {
       const priceInfo = getBookingPrice(b, trip);
       const extra = b.extraParcelsPrice || 0;
-      const combinedValue = priceInfo.value + extra;
+      const combinedValue = b.isFree ? extra : (priceInfo.value + extra);
       if (priceInfo.currency === 'ل.س') {
         totalSYP += combinedValue;
         hasSYP = true;
@@ -697,9 +709,10 @@ export default function AdminDashboard() {
       }
       return {
         currency: priceInfo.currency,
-        baseValue: priceInfo.value,
+        baseValue: b.isFree ? 0 : priceInfo.value,
         extra,
-        totalValue: combinedValue
+        totalValue: combinedValue,
+        isFree: !!b.isFree
       };
     });
 
@@ -781,15 +794,15 @@ export default function AdminDashboard() {
                       return `
                         <tr>
                           <td>${absoluteIndex + 1}</td>
-                          <td>${b.passengerName}</td>
+                          <td>${b.passengerName} ${b.isFree ? '<span style="color: #2563eb; font-weight: bold;">(مجاني)</span>' : ''}</td>
                           <td>${b.passengerPhone}</td>
                           <td>${b.passportNumber || '---'}</td>
-                          <td>${b.seatNumber}</td>
+                          <td>${b.seatNumber && b.seatNumber > 0 ? b.seatNumber : 'بدون تحديد'}</td>
                           <td>${b.to || trip.to}</td>
                           <td>${b.extraParcelsCount ? `${b.extraParcelsCount} طرود (+${priceInfo.extra} ${priceInfo.currency})` : '---'}</td>
-                          <td style="font-weight: bold; color: #059669;">
-                            ${priceInfo.totalValue} ${priceInfo.currency}
-                            ${priceInfo.extra > 0 ? `<div style="font-size: 9px; color: #666; font-weight: normal;">(أساسي: ${priceInfo.baseValue} + طرود: ${priceInfo.extra})</div>` : ''}
+                          <td style="font-weight: bold; color: ${b.isFree ? '#2563eb' : '#059669'};">
+                            ${b.isFree ? (priceInfo.extra > 0 ? `مجاني (+${priceInfo.extra} طرود)` : `مجاني (0 ${priceInfo.currency})`) : `${priceInfo.totalValue} ${priceInfo.currency}`}
+                            ${!b.isFree && priceInfo.extra > 0 ? `<div style="font-size: 9px; color: #666; font-weight: normal;">(أساسي: ${priceInfo.baseValue} + طرود: ${priceInfo.extra})</div>` : ''}
                           </td>
                           <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
                         </tr>
@@ -1703,7 +1716,7 @@ export default function AdminDashboard() {
   const staff = users.filter(u => u.role === 'staff' || u.role === 'admin');
 
   const totalRevenue = bookings
-    .filter(b => b.status === 'confirmed')
+    .filter(b => b.status === 'confirmed' && !b.isFree)
     .reduce((acc, b) => {
       const trip = trips.find(t => t.id === b.tripId);
       return acc + (trip?.priceSAR || trip?.price || 0);
@@ -1723,7 +1736,7 @@ export default function AdminDashboard() {
       passengerName: booking.passengerName,
       passengerPhone: booking.passengerPhone,
       passportNumber: booking.passportNumber || '',
-      seatNumber: booking.seatNumber,
+      seatNumber: booking.seatNumber || 0,
       extraParcelsCount: booking.extraParcelsCount || 0,
       extraParcelsPrice: booking.extraParcelsPrice || 0
     });
@@ -1743,8 +1756,10 @@ export default function AdminDashboard() {
       if (oldBooking.seatNumber !== editBookingData.seatNumber) {
         const trip = trips.find(t => t.id === oldBooking.tripId);
         if (trip) {
-          const newBookedSeats = (trip.bookedSeats || []).filter(s => s !== oldBooking.seatNumber);
-          newBookedSeats.push(editBookingData.seatNumber);
+          const newBookedSeats = (trip.bookedSeats || []).filter(s => s !== oldBooking.seatNumber && s > 0);
+          if (editBookingData.seatNumber && Number(editBookingData.seatNumber) > 0) {
+            newBookedSeats.push(Number(editBookingData.seatNumber));
+          }
           await updateDoc(doc(db, 'trips', trip.id), {
             bookedSeats: newBookedSeats
           });
@@ -1762,7 +1777,7 @@ export default function AdminDashboard() {
     const trip = trips.find(t => t.id === selectedTripId);
     if (!trip) return;
 
-    const { passengerName, passengerPhone, passportNumber, seatNumber, paymentMethod, status, to } = adminBookingData;
+    const { passengerName, passengerPhone, passportNumber, seatNumber, paymentMethod, status, to, isFree } = adminBookingData;
 
     if (!passengerName.trim()) {
       setError('يرجى إدخال اسم المسافر');
@@ -1772,8 +1787,13 @@ export default function AdminDashboard() {
       setError('يرجى إدخال رقم هاتف المسافر');
       return;
     }
-    if (!seatNumber) {
-      setError('يرجى اختيار رقم المقعد');
+
+    const isUnassignedSeat = seatNumber === 0 || seatNumber === '0' || seatNumber === 'none';
+    const numSeat = Number(seatNumber);
+    const hasExplicitSeat = !isUnassignedSeat && !isNaN(numSeat) && numSeat > 0;
+
+    if (!hasExplicitSeat && !isUnassignedSeat) {
+      setError('يرجى اختيار رقم المقعد أو تحديد "بدون تحديد مقعد"');
       return;
     }
 
@@ -1781,7 +1801,7 @@ export default function AdminDashboard() {
     setError(null);
 
     try {
-      // 1. Double check seat is still available in Firestore
+      // 1. Double check seat is still available in Firestore if explicit seat chosen
       const tripRef = doc(db, 'trips', trip.id);
       const tripSnap = await getDoc(tripRef);
       if (!tripSnap.exists()) {
@@ -1790,35 +1810,42 @@ export default function AdminDashboard() {
 
       const latestTripData = tripSnap.data();
       const latestBookedSeats = latestTripData.bookedSeats || [];
-      if (latestBookedSeats.includes(seatNumber)) {
-        throw new Error(`المقعد رقم ${seatNumber} تم حجزه مسبقاً، يرجى اختيار مقعد آخر.`);
+      if (hasExplicitSeat && latestBookedSeats.includes(numSeat)) {
+        throw new Error(`المقعد رقم ${numSeat} تم حجزه مسبقاً، يرجى اختيار مقعد آخر.`);
       }
 
       // 2. Add booking document
       const fullPhoneNumber = `${adminBookingCountryCode}${passengerPhone.replace(/^0+/, '')}`;
-      const bookingData = {
+      const bookingData: any = {
         tripId: trip.id,
         from: trip.from,
         to: to || trip.to,
-        seatNumber: Number(seatNumber),
+        seatNumber: hasExplicitSeat ? numSeat : 0,
         status: status || 'confirmed',
-        paymentMethod: paymentMethod || 'later',
+        paymentMethod: isFree ? 'free' : (paymentMethod || 'later'),
         bookingDate: new Date().toISOString(),
         userId: 'guest',
         passengerName: passengerName.trim(),
         passengerPhone: fullPhoneNumber,
         passengerEmail: '',
         passportNumber: passportNumber.trim(),
+        isFree: !!isFree
       };
 
       await addDoc(collection(db, 'bookings'), bookingData);
 
       // 3. Update trip bookedSeats & availableSeats
-      const updatedBookedSeats = [...latestBookedSeats, Number(seatNumber)];
-      await updateDoc(tripRef, {
-        bookedSeats: updatedBookedSeats,
-        availableSeats: Math.max(0, (latestTripData.availableSeats || trip.totalSeats || 35) - 1)
-      });
+      if (hasExplicitSeat) {
+        const updatedBookedSeats = [...latestBookedSeats, numSeat];
+        await updateDoc(tripRef, {
+          bookedSeats: updatedBookedSeats,
+          availableSeats: Math.max(0, (latestTripData.availableSeats || trip.totalSeats || 35) - 1)
+        });
+      } else {
+        await updateDoc(tripRef, {
+          availableSeats: Math.max(0, (latestTripData.availableSeats || trip.totalSeats || 35) - 1)
+        });
+      }
 
       setSuccess('تم إضافة الحجز بنجاح');
       setShowAddBookingForm(false);
@@ -1826,10 +1853,11 @@ export default function AdminDashboard() {
         passengerName: '',
         passengerPhone: '',
         passportNumber: '',
-        seatNumber: 0,
+        seatNumber: '',
         paymentMethod: 'later',
         status: 'confirmed',
-        to: trip.to
+        to: trip.to,
+        isFree: false
       });
     } catch (err: any) {
       console.error('Error adding admin booking:', err);
@@ -3123,11 +3151,12 @@ export default function AdminDashboard() {
                         <div className="space-y-1">
                           <label className="text-xs font-bold text-stone-500">رقم المقعد *</label>
                           <select
-                            value={adminBookingData.seatNumber || ''}
-                            onChange={e => setAdminBookingData({...adminBookingData, seatNumber: Number(e.target.value)})}
+                            value={adminBookingData.seatNumber !== undefined ? String(adminBookingData.seatNumber) : ''}
+                            onChange={e => setAdminBookingData({...adminBookingData, seatNumber: e.target.value === '0' ? 0 : (e.target.value === '' ? '' : Number(e.target.value))})}
                             className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-right"
                           >
                             <option value="">-- اختر مقعداً شاغراً --</option>
+                            <option value="0" className="text-blue-600 font-bold">بدون تحديد مقعد (يظهر بالكشوفات بدون رقم مقعد)</option>
                             {(() => {
                               const trip = trips.find(t => t.id === selectedTripId);
                               const totalSeats = trip?.totalSeats || 35;
@@ -3158,12 +3187,14 @@ export default function AdminDashboard() {
                         <div className="space-y-1">
                           <label className="text-xs font-bold text-stone-500">طريقة الدفع</label>
                           <select
-                            value={adminBookingData.paymentMethod}
+                            disabled={adminBookingData.isFree}
+                            value={adminBookingData.isFree ? 'free' : adminBookingData.paymentMethod}
                             onChange={e => setAdminBookingData({...adminBookingData, paymentMethod: e.target.value as any})}
-                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-right"
+                            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-right disabled:opacity-60"
                           >
                             <option value="later">عند السفر (لاحقاً)</option>
                             <option value="online">دفع إلكتروني</option>
+                            <option value="free">حجز مجاني</option>
                           </select>
                         </div>
 
@@ -3178,6 +3209,26 @@ export default function AdminDashboard() {
                             <option value="pending">قيد الانتظار</option>
                           </select>
                         </div>
+
+                        <div className="space-y-1 sm:col-span-2 md:col-span-3">
+                          <label className="flex items-center gap-3 p-3 bg-blue-50/60 border border-blue-200 rounded-xl cursor-pointer hover:bg-blue-100/50 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              id="isFreeCustomerBooking"
+                              checked={adminBookingData.isFree || false} 
+                              onChange={e => setAdminBookingData({
+                                ...adminBookingData, 
+                                isFree: e.target.checked,
+                                paymentMethod: e.target.checked ? 'later' : adminBookingData.paymentMethod
+                              })}
+                              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-stone-300"
+                            />
+                            <div>
+                              <span className="text-sm font-bold text-blue-900 block">حجز مجاني للعميل (بدون تكلفة / 0 ريال)</span>
+                              <span className="text-xs text-blue-600">عند تفعيل هذا الخيار يتم تسجيل الحجز بدون احتساب أي مبالغ ويظهر في الكشوفات كحجز مجاني.</span>
+                            </div>
+                          </label>
+                        </div>
                       </div>
 
                       {(() => {
@@ -3187,12 +3238,15 @@ export default function AdminDashboard() {
                           from: trip.from,
                           to: adminBookingData.to || trip.to,
                           tripId: trip.id,
+                          isFree: adminBookingData.isFree,
                         } as Booking;
                         const priceInfo = getBookingPrice(tempBooking, trip);
                         return (
-                          <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center text-sm font-bold text-emerald-800" dir="rtl">
-                            <span>سعر التذكرة المعتمد لهذه الوجهة:</span>
-                            <span className="text-lg text-emerald-600 font-bold">{priceInfo.value} {priceInfo.currency}</span>
+                          <div className={`p-4 rounded-2xl border flex justify-between items-center text-sm font-bold ${adminBookingData.isFree ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-emerald-50 border-emerald-100 text-emerald-800'}`} dir="rtl">
+                            <span>{adminBookingData.isFree ? 'حالة التكلفة (حجز مجاني):' : 'سعر التذكرة المعتمد لهذه الوجهة:'}</span>
+                            <span className={`text-lg font-bold ${adminBookingData.isFree ? 'text-blue-600' : 'text-emerald-600'}`}>
+                              {adminBookingData.isFree ? 'مجاني (0)' : `${priceInfo.value} ${priceInfo.currency}`}
+                            </span>
                           </div>
                         );
                       })()}
@@ -3274,7 +3328,14 @@ export default function AdminDashboard() {
                                 </div>
                               ) : (
                                 <>
-                                  <p className="font-bold">{booking.passengerName}</p>
+                                  <p className="font-bold flex items-center gap-1.5 flex-wrap">
+                                    <span>{booking.passengerName}</span>
+                                    {booking.isFree && (
+                                      <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold border border-blue-200">
+                                        مجاني
+                                      </span>
+                                    )}
+                                  </p>
                                   <p className="text-xs text-stone-400">{booking.passengerPhone}</p>
                                   {booking.from && booking.to && (
                                     <p className="text-[10px] text-emerald-600 font-bold mt-1">
@@ -3333,12 +3394,24 @@ export default function AdminDashboard() {
                                   className="bg-white border p-1 rounded w-16 text-xs"
                                 />
                               ) : (
-                                booking.seatNumber
+                                booking.seatNumber && booking.seatNumber > 0 ? (
+                                  <span className="font-bold">{booking.seatNumber}</span>
+                                ) : (
+                                  <span className="text-[10px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-md font-bold border border-stone-200">
+                                    بدون تحديد
+                                  </span>
+                                )
                               )}
                             </td>
                             <td className="p-4">
-                              <span className={`text-[10px] px-2 py-1 rounded-full ${booking.paymentMethod === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {booking.paymentMethod === 'online' ? 'إلكتروني' : 'عند السفر'}
+                              <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${
+                                booking.isFree 
+                                  ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                                  : booking.paymentMethod === 'online' 
+                                    ? 'bg-emerald-100 text-emerald-700' 
+                                    : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {booking.isFree ? 'مجاني' : (booking.paymentMethod === 'online' ? 'إلكتروني' : 'عند السفر')}
                               </span>
                             </td>
                             <td className="p-4">
