@@ -12,11 +12,57 @@ import {
   Calendar, Shield, UserCheck, Settings, LayoutDashboard,
   CreditCard, MapPin, Clock, AlertCircle, X, Printer, Download, Search,
   Image as ImageIcon, DollarSign, Bell, Send, Smartphone, CheckCircle2,
-  ArrowRightLeft, FileText
+  ArrowRightLeft, FileText, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AdminCities from './AdminCities';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
+const WhatsAppIcon = ({ size = 18, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    className={className}
+    style={{ display: 'inline-block', verticalAlign: 'middle' }}
+  >
+    <path d="M12.031 2C6.511 2 2.016 6.495 2.016 12.015c0 1.942.553 3.758 1.517 5.297L2.016 22l4.832-1.488c1.472.87 3.18 1.378 4.983 1.378 5.72 0 10.215-4.495 10.215-10.015C22.046 6.355 17.551 2 12.031 2zm5.834 14.336c-.244.685-1.42 1.309-1.956 1.378-.508.065-1.168.1-3.376-.814-2.822-1.168-4.636-4.048-4.776-4.233-.14-.185-1.144-1.523-1.144-2.906 0-1.383.722-2.062.977-2.345.255-.283.56-.353.748-.353.187 0 .374.004.538.012.174.008.406-.066.634.482.234.562.798 1.956.868 2.1.07.144.116.312.023.498-.093.186-.14.302-.279.467-.14.165-.295.369-.42.495-.14.14-.287.293-.124.572.163.279.726 1.196 1.558 1.936 1.07.954 1.97 1.25 2.25 1.39.279.14.442.116.605-.07.163-.186.698-.814.884-1.093.186-.279.372-.233.628-.14.256.093 1.628.767 1.907.907.279.14.465.209.535.326.07.116.07.674-.174 1.359z"/>
+  </svg>
+);
+
+const formatPhoneForWhatsApp = (phoneStr: string): string => {
+  if (!phoneStr) return '';
+  const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  let cleaned = phoneStr.trim();
+  arabicDigits.forEach((d, idx) => {
+    cleaned = cleaned.replace(new RegExp(d, 'g'), String(idx));
+  });
+  cleaned = cleaned.replace(/[^\d]/g, '');
+  
+  if (cleaned.startsWith('00')) {
+    cleaned = cleaned.slice(2);
+  }
+
+  // Saudi Mobile
+  if (cleaned.startsWith('05') && cleaned.length === 10) {
+    return '966' + cleaned.slice(1);
+  }
+  if (cleaned.startsWith('5') && cleaned.length === 9) {
+    return '966' + cleaned;
+  }
+
+  // Syrian Mobile
+  if (cleaned.startsWith('09') && cleaned.length === 10) {
+    return '963' + cleaned.slice(1);
+  }
+  if (cleaned.startsWith('9') && cleaned.length === 9) {
+    return '963' + cleaned;
+  }
+
+  return cleaned;
+};
 
 type AdminTab = 'dashboard' | 'trips' | 'bookings' | 'drivers' | 'buses' | 'staff' | 'cities' | 'banners' | 'parcels' | 'notifications';
 
@@ -40,6 +86,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [gatewayUrl, setGatewayUrl] = useState<string>('');
   const [isSavingGateway, setIsSavingGateway] = useState<boolean>(false);
+  const [whatsAppLoadingId, setWhatsAppLoadingId] = useState<string | null>(null);
 
   // Form States
   const [newTrip, setNewTrip] = useState<Partial<Trip>>({
@@ -565,6 +612,359 @@ export default function AdminDashboard() {
       console.error('Error printing ticket:', err);
     } finally {
       setIsPrinting(false);
+    }
+  };
+
+  const shareOrDownloadPdf = async (
+    pdf: jsPDF, 
+    pdfBlob: Blob, 
+    fileName: string, 
+    shareTitle: string, 
+    shareText: string, 
+    phone: string
+  ) => {
+    const cleanPhone = formatPhoneForWhatsApp(phone);
+    const encodedText = encodeURIComponent(shareText);
+    const waUrl = cleanPhone 
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
+      : `https://api.whatsapp.com/send?text=${encodedText}`;
+
+    const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+    // Try Web Share API (native WhatsApp file sharing on mobile and supported browsers)
+    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          files: [pdfFile],
+        });
+        setSuccess('تمت مشاركة التذكرة عبر واتساب بنجاح.');
+        setTimeout(() => setSuccess(null), 4000);
+        return;
+      } catch (shareErr: any) {
+        if (shareErr.name === 'AbortError') {
+          return;
+        }
+        console.warn('Share API failed, falling back to download + wa.me link:', shareErr);
+      }
+    }
+
+    // Fallback: save PDF directly to device and open WhatsApp chat
+    pdf.save(fileName);
+    window.open(waUrl, '_blank');
+    setSuccess('تم حفظ ملف التذكرة (PDF) بنجاح وجارٍ فتح محادثة واتساب لإرفاق الملف للعميل.');
+    setTimeout(() => setSuccess(null), 5000);
+  };
+
+  const handleSendBookingWhatsApp = async (booking: Booking, tripObj?: Trip) => {
+    setWhatsAppLoadingId(booking.id);
+    try {
+      const elementId = `print-ticket-${booking.id}`;
+      const element = document.getElementById(elementId);
+      if (!element) {
+        setError('تعذر العثور على قالب تذكرة العميل.');
+        setTimeout(() => setError(null), 4000);
+        return;
+      }
+
+      const originalDisplay = element.style.display;
+      element.style.display = 'block';
+
+      const img = element.querySelector('img');
+      if (img && !img.complete) {
+        await new Promise(r => {
+          img.onload = r;
+          img.onerror = r;
+          setTimeout(r, 500);
+        });
+      }
+
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc) => {
+          const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+          styles.forEach(s => s.remove());
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            * {
+              color: #000000 !important;
+              border-color: #000000 !important;
+              background-image: none !important;
+              text-shadow: none !important;
+              box-shadow: none !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          `;
+          clonedDoc.head?.appendChild(style);
+        }
+      });
+
+      element.style.display = originalDisplay || 'none';
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a5'
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 16;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const y = Math.max(8, (pageHeight - imgHeight) / 2);
+      pdf.addImage(imgData, 'PNG', 8, y, imgWidth, imgHeight);
+
+      const pdfBlob = pdf.output('blob');
+      const fileName = `تذكرة_${booking.passengerName}_${booking.id.slice(0, 8)}.pdf`;
+
+      const fromCity = booking.from || tripObj?.from || '';
+      const toCity = booking.to || tripObj?.to || '';
+      const seatDisplay = booking.seatNumber && booking.seatNumber > 0 ? String(booking.seatNumber) : 'بدون تحديد مقعد';
+
+      const priceInfo = tripObj ? getBookingPrice(booking, tripObj) : { value: 0, currency: '' };
+      const extra = booking.extraParcelsPrice || 0;
+      const total = priceInfo.value + extra;
+      const priceDisplay = booking.isFree 
+        ? (extra > 0 ? `مجاني (+${extra} ${priceInfo.currency} طرود إضافية)` : 'مجانية')
+        : `${total} ${priceInfo.currency}`;
+
+      const shareText = 
+`*العوجان للسياحة والسفر* 🚌
+مرحباً أ/ ${booking.passengerName}،
+مرفق لكم تذكرة الحجز بصيغة PDF.
+
+📋 *تفاصيل التذكرة:*
+• *رقم الحجز:* ${booking.id.slice(0, 8)}
+• *المسار:* ${fromCity} ⬅️ ${toCity}
+• *تاريخ الرحلة:* ${tripObj?.date || '---'}
+• *وقت الرحلة:* ${tripObj?.time || '---'}
+• *المقعد:* ${seatDisplay}
+• *رقم التتبع:* ${tripObj?.trackingNumber || '---'}
+• *قيمة التذكرة:* ${priceDisplay}
+
+📞 *للتواصل والاستفسار:*
+الرياض: 0500094210
+جدة: 0531160079
+سوريا: 0943013113
+
+نتمنى لكم رحلة سعيدة وموفقة! 🌟`;
+
+      await shareOrDownloadPdf(
+        pdf,
+        pdfBlob,
+        fileName,
+        `تذكرة سفر ${booking.passengerName}`,
+        shareText,
+        booking.passengerPhone || ''
+      );
+    } catch (err) {
+      console.error('Error generating booking PDF for WhatsApp:', err);
+      setError('حدث خطأ أثناء إعداد التذكرة بصيغة PDF.');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setWhatsAppLoadingId(null);
+    }
+  };
+
+  const generateParcelInvoiceHtml = (parcel: Parcel, trip?: Trip) => {
+    return `
+      <div style="max-width: 800px; margin: auto; padding: 20px; border: 2px solid #000000; font-size: 14px; line-height: 1.4; border-radius: 8px; color: #000000; background: #ffffff; direction: rtl; font-family: Arial, sans-serif; box-sizing: border-box;">
+        <div style="border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; color: #000000;">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <img 
+              src="/logoaujantravel.jpeg" 
+              crossorigin="anonymous"
+              style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 1.5px solid #000000;"
+            />
+            <div>
+              <h1 style="margin: 0; color: #000000; font-size: 20px; font-weight: 900;">العوجان للسياحة والسفر</h1>
+              <p style="margin: 2px 0 0 0; font-size: 13px; color: #000000; font-weight: 900;">خدمات شحن الطرود - تذكرة الشحن</p>
+            </div>
+          </div>
+          <div style="text-align: left;">
+            <p style="margin: 2px 0; font-size: 13px; color: #000000;"><strong>رقم بوليصة الشحن:</strong> ${parcel.waybillNumber}</p>
+            <p style="margin: 2px 0; font-size: 13px; color: #000000;"><strong>رقم تتبع الرحلة:</strong> <span style="color: #000000; font-weight: 900;">${trip?.trackingNumber || '---'}</span></p>
+            <p style="margin: 2px 0; font-size: 13px; color: #000000;"><strong>التاريخ:</strong> ${new Date(parcel.createdAt).toLocaleDateString('ar-EG')}</p>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; color: #000000;">
+          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">معلومات المرسل</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الاسم:</span> ${parcel.senderName}</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الهاتف:</span> ${parcel.senderPhone}</div>
+          </div>
+          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">معلومات المستلم</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الاسم:</span> ${parcel.receiverName}</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الهاتف:</span> ${parcel.receiverPhone}</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; color: #000000;">
+          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">مسار الشحنة</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">من:</span> ${parcel.from}</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">إلى:</span> ${parcel.to}</div>
+          </div>
+          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">تفاصيل إضافية</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">ملاحظات:</span> ${parcel.note || '---'}</div>
+            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الحالة:</span> ${parcel.status === 'pending' ? 'قيد الانتظار' : parcel.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 15px; padding: 12px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; text-align: left; display: flex; justify-content: space-between; align-items: center; color: #000000;">
+          <span style="font-size: 14px; margin: 0; font-weight: 900; color: #000000;">إجمالي تكلفة الشحن:</span>
+          <div style="font-size: 18px; font-weight: 900; color: #000000; margin: 0;">${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}</div>
+        </div>
+
+        <!-- أرقام فروع الشحن -->
+        <div style="margin-top: 15px; padding: 10px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; color: #000000;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="font-weight: 900; font-size: 13px; color: #000000;">
+              📞 أرقام فروع الشحن:
+            </div>
+            <div style="display: flex; gap: 20px; align-items: center; font-size: 13px; font-weight: 900; color: #000000;">
+              <span>الرياض: ٠٥٠٠٠٩٤٢١٠</span>
+              <span>جدة: ٠٥٣١١٦٠٠٧٩</span>
+              <span>سوريا: ٠٩٨٩٨٨٩٠٩٢</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 18px; border: 1.5px solid #000000; border-radius: 8px; padding: 12px; background: #ffffff; font-size: 11px; color: #000000; line-height: 1.8; text-align: right;">
+          <div style="font-size: 12px; font-weight: 900; color: #000000; margin-bottom: 6px; border-bottom: 1.5px solid #000000; padding-bottom: 3px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
+          <ul style="padding-right: 15px; margin: 0; list-style-type: none; color: #000000;">
+            <li style="margin-bottom: 4px;">* الشركة غير مسؤولة عن البضائع إذا لم يتم إستلامها خلال ١٠ أيام وعن سندات الاستلام بعد ١٥ يوم من تاريخ الاستلام.</li>
+            <li style="margin-bottom: 4px;">* الشركة غير مسؤولة عما بداخل الإرساليه من أشياء قابله للكسر أو ثمينة بدون تأمين من قبلنا.</li>
+            <li style="margin-bottom: 4px;">* في حالة فقدان الارسالية الشركة لا تتحمل أكثر من ١٠٠ ريال كقيمة الارسالية إذا لم يتم تأمين عليه من قبلنا.</li>
+            <li style="margin-bottom: 4px;">• استلامك الفاتورة يعتبر إطلاعك على الشروط.</li>
+            <li style="margin-bottom: 4px;">* الشركة لا تتحمل مسؤولية الإرسالية في حالة تعرضها لكوارث طبيعية ولم يكتب عليها الاسم أو رقم التواصل.</li>
+            <li style="margin-bottom: 4px;">* الشركة غير مسؤولة عن مابداخل الإرسالية الغير مصرح بها.</li>
+          </ul>
+        </div>
+
+        <div style="margin-top: 15px; text-align: center; font-size: 11px; color: #000000; border-top: 2px solid #000000; padding-top: 10px; font-weight: bold;">
+          <div style="margin-bottom: 6px; font-size: 12px; font-weight: 900; color: #000000;">
+            أرقام فروع الشحن: الرياض: ٠٥٠٠٠٩٤٢١٠ | جدة: ٠٥٣١١٦٠٠٧٩ | سوريا: ٠٩٨٩٨٨٩٠٩٢
+          </div>
+          <p style="margin: 3px 0; color: #000000;">شكراً لتعاملكم معنا. يرجى الاحتفاظ بهذه التذكرة لتتبع شحنتكم.</p>
+          <p style="margin: 3px 0; color: #000000;">هذه الوثيقة صدرت إلكترونياً ولا تحتاج لختم.</p>
+        </div>
+      </div>
+    `;
+  };
+
+  const handleSendParcelWhatsApp = async (parcel: Parcel) => {
+    setWhatsAppLoadingId(parcel.id);
+    try {
+      const trip = trips.find(t => t.id === parcel.tripId);
+      
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '0';
+      tempContainer.style.width = '780px';
+      tempContainer.style.backgroundColor = '#ffffff';
+      tempContainer.style.zIndex = '-9999';
+      tempContainer.innerHTML = generateParcelInvoiceHtml(parcel, trip);
+      document.body.appendChild(tempContainer);
+
+      const img = tempContainer.querySelector('img');
+      if (img && !img.complete) {
+        await new Promise(r => {
+          img.onload = r;
+          img.onerror = r;
+          setTimeout(r, 600);
+        });
+      }
+
+      const canvas = await html2canvas(tempContainer, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc) => {
+          const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+          styles.forEach(s => s.remove());
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            * {
+              color: #000000 !important;
+              border-color: #000000 !important;
+              background-image: none !important;
+              text-shadow: none !important;
+              box-shadow: none !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          `;
+          clonedDoc.head?.appendChild(style);
+        }
+      });
+
+      document.body.removeChild(tempContainer);
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      const imgWidth = 190;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+
+      const pdfBlob = pdf.output('blob');
+      const fileName = `بوليصة_شحن_${parcel.waybillNumber}.pdf`;
+
+      const statusMap: Record<string, string> = {
+        pending: 'قيد الانتظار',
+        shipped: 'تم الشحن',
+        delivered: 'تم التسليم'
+      };
+      const statusText = statusMap[parcel.status] || parcel.status;
+      const priceText = `${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}`;
+
+      const shareText = 
+`*العوجان للسياحة والسفر - خدمات الشحن* 📦
+مرحباً بكم،
+مرفق لكم بوليصة شحن الطرد بصيغة PDF.
+
+📦 *تفاصيل الشحنة:*
+• *رقم البوليصة:* ${parcel.waybillNumber}
+• *المرسل:* ${parcel.senderName}
+• *المستلم:* ${parcel.receiverName} (${parcel.receiverPhone})
+• *المسار:* ${parcel.from} ⬅️ ${parcel.to}
+• *الحالة:* ${statusText}
+• *تكلفة الشحن:* ${priceText}
+${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNumber}\n` : ''}
+📞 *أرقام فروع الشحن:*
+الرياض: 0500094210
+جدة: 0531160079
+سوريا: 0989889092
+
+شكراً لتعاملكم مع العوجان للسياحة والسفر! 🌟`;
+
+      const targetPhone = parcel.senderPhone || parcel.receiverPhone || '';
+      await shareOrDownloadPdf(
+        pdf,
+        pdfBlob,
+        fileName,
+        `بوليصة شحن ${parcel.waybillNumber}`,
+        shareText,
+        targetPhone
+      );
+    } catch (err) {
+      console.error('Error generating parcel PDF for WhatsApp:', err);
+      setError('حدث خطأ أثناء إعداد تذكرة الشحن بصيغة PDF.');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setWhatsAppLoadingId(null);
     }
   };
 
@@ -3461,6 +3861,18 @@ export default function AdminDashboard() {
                                       <FileText size={16} />
                                     </button>
                                     <button 
+                                      onClick={() => handleSendBookingWhatsApp(booking, trips.find(t => t.id === booking.tripId))}
+                                      disabled={whatsAppLoadingId === booking.id}
+                                      className="text-[#25D366] p-2 hover:bg-emerald-50 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50"
+                                      title="إرسال التذكرة PDF عبر واتساب للعميل"
+                                    >
+                                      {whatsAppLoadingId === booking.id ? (
+                                        <Loader2 size={16} className="animate-spin text-emerald-600" />
+                                      ) : (
+                                        <WhatsAppIcon size={16} />
+                                      )}
+                                    </button>
+                                    <button 
                                       onClick={() => {
                                         setDirectNotificationBooking(booking);
                                         setDirectNotifTitle('تحديث بخصوص رحلتك');
@@ -3916,6 +4328,18 @@ export default function AdminDashboard() {
                                     <FileText size={18} />
                                   </button>
                                   <button 
+                                    onClick={() => handleSendParcelWhatsApp(parcel)}
+                                    disabled={whatsAppLoadingId === parcel.id}
+                                    className="p-2 text-[#25D366] hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center"
+                                    title="إرسال تذكرة الشحن PDF عبر واتساب"
+                                  >
+                                    {whatsAppLoadingId === parcel.id ? (
+                                      <Loader2 size={18} className="animate-spin text-emerald-600" />
+                                    ) : (
+                                      <WhatsAppIcon size={18} />
+                                    )}
+                                  </button>
+                                  <button 
                                     onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)}
                                     className="p-2 text-stone-400 hover:text-red-500 transition-colors"
                                     title="حذف"
@@ -4005,6 +4429,18 @@ export default function AdminDashboard() {
                                       title="طباعة تذكرة الشحن بدون سعر (البيانات فقط)"
                                     >
                                       <FileText size={18} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleSendParcelWhatsApp(parcel)}
+                                      disabled={whatsAppLoadingId === parcel.id}
+                                      className="p-2 text-[#25D366] hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center"
+                                      title="إرسال تذكرة الشحن PDF عبر واتساب"
+                                    >
+                                      {whatsAppLoadingId === parcel.id ? (
+                                        <Loader2 size={18} className="animate-spin text-emerald-600" />
+                                      ) : (
+                                        <WhatsAppIcon size={18} />
+                                      )}
                                     </button>
                                     <button onClick={() => handleDeleteRequest('parcels', parcel.id, `الشحنة ${parcel.waybillNumber}`)} className="p-2 text-stone-400 hover:text-red-500" title="حذف">
                                       <Trash2 size={18} />
