@@ -989,15 +989,15 @@ export default function BookingPage() {
                 style={{ 
                   backgroundColor: '#ffffff', 
                   borderColor: '#000000', 
-                  borderWidth: '2.5px',
+                  borderWidth: '3px',
                   borderStyle: 'solid',
                   borderRadius: '16px',
-                  padding: '24px',
+                  padding: '32px',
                   width: '100%',
-                  maxWidth: '400px',
+                  maxWidth: '520px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '20px',
+                  gap: '24px',
                   position: 'relative',
                   overflow: 'hidden',
                   boxSizing: 'border-box',
@@ -1007,74 +1007,74 @@ export default function BookingPage() {
                   color: '#000000'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', zIndex: 1 }}>
                   <img 
                     src="/logoaujantravel.jpeg" 
                     alt="Logo" 
                     referrerPolicy="no-referrer"
                     crossOrigin="anonymous"
                     style={{ 
-                      width: '48px', 
-                      height: '48px', 
+                      width: '60px', 
+                      height: '60px', 
                       objectFit: 'cover', 
                       borderRadius: '50%',
-                      border: '2px solid #000000',
+                      border: '2.5px solid #000000',
                       WebkitPrintColorAdjust: 'exact',
                       printColorAdjust: 'exact'
                     }} 
                   />
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '11px', color: '#000000', margin: 0, lineHeight: 1.2, fontWeight: 'bold' }}>
+                    <p style={{ fontSize: '13px', color: '#000000', margin: 0, lineHeight: 1.2, fontWeight: '900' }}>
                       {selectedTrip?.tripType === 'umrah' ? 'تذكرة رحلة عمرة' : 'تذكرة سفر دولية'}
                     </p>
-                    <p style={{ fontWeight: '900', color: '#000000', margin: '2px 0 0 0', fontSize: '18px' }}>العوجان للسياحة</p>
+                    <p style={{ fontWeight: '900', color: '#000000', margin: '3px 0 0 0', fontSize: '24px', letterSpacing: 'normal', lineHeight: 1.3, fontFamily: "'Segoe UI', Tahoma, Arial, sans-serif" }}>العوجان للسياحة</p>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>الاسم</p><p style={{ fontWeight: '900', color: '#000000', margin: 0, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.passengerName}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم الجواز</p><p style={{ fontWeight: '900', color: '#000000', margin: 0, fontSize: '13px' }}>{booking.passportNumber || '---'}</p></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '14px' }}>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>الاسم</p><p style={{ fontWeight: '900', color: '#000000', margin: '2px 0 0 0', fontSize: '17px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.passengerName}</p></div>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم الجواز</p><p style={{ fontWeight: '900', color: '#000000', margin: '2px 0 0 0', fontSize: '16px' }}>{booking.passportNumber || '---'}</p></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم الحجز</p><p style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: '900', color: '#000000', margin: 0 }}>{booking.id.slice(0, 8)}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: '900', color: '#000000', margin: 0 }}>{selectedTrip?.trackingNumber}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '14px' }}>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم الحجز</p><p style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: '900', color: '#000000', margin: '2px 0 0 0' }}>{booking.id.slice(0, 8)}</p></div>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم التتبع</p><p style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: '900', color: '#000000', margin: '2px 0 0 0' }}>{selectedTrip?.trackingNumber}</p></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '12px' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم العميل / الهاتف</p><p style={{ fontWeight: '900', fontSize: '14px', color: '#000000', margin: 0, letterSpacing: '0.5px' }}>{booking.passengerPhone || '---'}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '14px' }}>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>رقم العميل / الهاتف</p><p style={{ fontWeight: '900', fontSize: '17px', color: '#000000', margin: '2px 0 0 0', letterSpacing: '0.5px' }}>{booking.passengerPhone || '---'}</p></div>
                   </div>
-                  <div style={{ backgroundColor: '#ffffff', border: '2px solid #000000', padding: '12px 14px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>من</p><p style={{ fontWeight: '900', fontSize: '18px', color: '#000000', margin: 0 }}>{booking.from || selectedTrip?.from}</p></div>
-                    <div style={{ color: '#000000', fontSize: '22px', fontWeight: '900' }}>←</div>
+                  <div style={{ backgroundColor: '#ffffff', border: '2.5px solid #000000', padding: '14px 16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>من</p><p style={{ fontWeight: '900', fontSize: '22px', color: '#000000', margin: '2px 0 0 0' }}>{booking.from || selectedTrip?.from}</p></div>
+                    <div style={{ color: '#000000', fontSize: '26px', fontWeight: '900' }}>←</div>
                     <div style={{ textAlign: 'left' }}>
-                      <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>إلى</p>
-                      <p style={{ fontWeight: '900', fontSize: '18px', color: '#000000', margin: 0 }}>{booking.to || selectedTrip?.to}</p>
+                      <p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>إلى</p>
+                      <p style={{ fontWeight: '900', fontSize: '22px', color: '#000000', margin: '2px 0 0 0' }}>{booking.to || selectedTrip?.to}</p>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>التاريخ</p><p style={{ fontWeight: '900', fontSize: '11px', color: '#000000', margin: 0 }}>{formatDateArabic(selectedTrip?.date || '').split('،')[1] || formatDateArabic(selectedTrip?.date || '')}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>الوقت</p><p style={{ fontWeight: '900', fontSize: '12px', color: '#000000', margin: 0 }}>{selectedTrip?.time}</p></div>
-                    <div><p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>المقعد</p><p style={{ fontWeight: '900', fontSize: '14px', color: '#000000', margin: 0 }}>{booking.seatNumber}</p></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', textAlign: 'center' }}>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>التاريخ</p><p style={{ fontWeight: '900', fontSize: '14px', color: '#000000', margin: '2px 0 0 0' }}>{formatDateArabic(selectedTrip?.date || '').split('،')[1] || formatDateArabic(selectedTrip?.date || '')}</p></div>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>الوقت</p><p style={{ fontWeight: '900', fontSize: '15px', color: '#000000', margin: '2px 0 0 0' }}>{selectedTrip?.time}</p></div>
+                    <div><p style={{ fontSize: '12px', textTransform: 'uppercase', color: '#000000', fontWeight: 'bold', margin: 0 }}>المقعد</p><p style={{ fontWeight: '900', fontSize: '18px', color: '#000000', margin: '2px 0 0 0' }}>{booking.seatNumber && booking.seatNumber > 0 ? booking.seatNumber : 'بدون تحديد'}</p></div>
                   </div>
-                  <div style={{ backgroundColor: '#ffffff', padding: '8px', borderRadius: '8px', border: '1.5px solid #000000', textAlign: 'center' }}>
-                    <p style={{ fontSize: '10px', color: '#000000', fontWeight: '900', margin: 0 }}>🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً</p>
+                  <div style={{ backgroundColor: '#ffffff', padding: '10px', borderRadius: '10px', border: '2px solid #000000', textAlign: 'center' }}>
+                    <p style={{ fontSize: '13px', color: '#000000', fontWeight: '900', margin: 0 }}>🧳 يسمح لكل راكب عدد حقيبتين سفر مجاناً</p>
                   </div>
                   {/* أرقام الفروع */}
-                  <div style={{ backgroundColor: '#ffffff', padding: '7px 8px', borderRadius: '8px', border: '1.5px solid #000000', textAlign: 'center' }}>
-                    <p style={{ fontSize: '9px', color: '#000000', fontWeight: '900', margin: '0 0 3px 0' }}>📞 أرقام فروع العوجان للسياحة</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', fontSize: '9px', fontWeight: '900', color: '#000000' }}>
+                  <div style={{ backgroundColor: '#ffffff', padding: '9px 12px', borderRadius: '10px', border: '2px solid #000000', textAlign: 'center' }}>
+                    <p style={{ fontSize: '12px', color: '#000000', fontWeight: '900', margin: '0 0 4px 0' }}>📞 أرقام فروع العوجان للسياحة</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', fontSize: '12px', fontWeight: '900', color: '#000000' }}>
                       <span>الرياض: ٠٥٠٠٠٩٤٢١٠</span>
                       <span>جدة: ٠٥٣١١٦٠٠٧٩</span>
                       <span>سوريا: ٠٩٤٣٠١٣١١٣</span>
                     </div>
                   </div>
                 </div>
-                <div style={{ borderTop: '2.5px dashed #000000', paddingTop: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '3px', height: '32px', width: '100%' }}>
+                <div style={{ borderTop: '3px dashed #000000', paddingTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '3px', height: '38px', width: '100%' }}>
                     {[3,1,4,2,1,3,2,4,1,2,3,2,1,4,3,1,2,4,2,1,3,2,4,1,3,2,4,1,3,2].map((w, bi) => (
                       <div key={bi} style={{ width: `${w}px`, height: '100%', backgroundColor: '#000000' }} />
                     ))}
                   </div>
-                  <p style={{ margin: 0, fontSize: '10px', fontFamily: 'monospace', color: '#000000', fontWeight: '900' }}>
+                  <p style={{ margin: 0, fontSize: '12px', fontFamily: 'monospace', color: '#000000', fontWeight: '900' }}>
                     {booking.id.slice(0, 10).toUpperCase()}
                   </p>
                 </div>
@@ -1113,6 +1113,8 @@ export default function BookingPage() {
                           background-image: none !important;
                           text-shadow: none !important;
                           box-shadow: none !important;
+                          letter-spacing: normal !important;
+                          font-family: 'Segoe UI', Tahoma, Arial, 'Traditional Arabic', sans-serif !important;
                           -webkit-print-color-adjust: exact !important;
                           print-color-adjust: exact !important;
                         }
@@ -1164,6 +1166,8 @@ export default function BookingPage() {
                           background-image: none !important;
                           text-shadow: none !important;
                           box-shadow: none !important;
+                          letter-spacing: normal !important;
+                          font-family: 'Segoe UI', Tahoma, Arial, 'Traditional Arabic', sans-serif !important;
                           -webkit-print-color-adjust: exact !important;
                           print-color-adjust: exact !important;
                         }
@@ -1181,7 +1185,7 @@ export default function BookingPage() {
                     <title>طباعة التذاكر</title>
                     <style>
                       @media print {
-                        @page { size: auto; margin: 10mm; }
+                        @page { size: auto; margin: 6mm; }
                         body { margin: 0; padding: 0; background: #ffffff !important; }
                         .ticket-page { page-break-after: always; break-after: page; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
                         .ticket-page:last-child { page-break-after: avoid; break-after: avoid; }
@@ -1196,7 +1200,7 @@ export default function BookingPage() {
                         gap: 20px;
                       }
                       img {
-                        max-width: 420px;
+                        max-width: 600px;
                         width: 100%;
                         height: auto;
                         display: block;

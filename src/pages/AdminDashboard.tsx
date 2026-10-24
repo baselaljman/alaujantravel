@@ -273,8 +273,8 @@ export default function AdminDashboard() {
         id={idAttr}
         style={{ 
           display: 'none', 
-          width: '800px', 
-          minHeight: '300px',
+          width: '1040px', 
+          minHeight: '390px',
           height: 'auto',
           backgroundColor: '#ffffff',
           fontFamily: 'Arial, sans-serif',
@@ -285,8 +285,8 @@ export default function AdminDashboard() {
         <div style={{ 
           display: 'flex', 
           height: '100%', 
-          border: '2.5px solid #000000',
-          borderRadius: '12px',
+          border: '3px solid #000000',
+          borderRadius: '14px',
           overflow: 'hidden',
           direction: 'rtl',
           boxSizing: 'border-box',
@@ -295,9 +295,9 @@ export default function AdminDashboard() {
           {/* Main Part */}
           <div style={{ 
             flex: 3, 
-            padding: '20px', 
+            padding: '24px 26px', 
             position: 'relative', 
-            borderLeft: '2.5px dashed #000000', 
+            borderLeft: '3px dashed #000000', 
             textAlign: 'right',
             boxSizing: 'border-box',
             backgroundColor: '#ffffff'
@@ -305,101 +305,119 @@ export default function AdminDashboard() {
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
-              marginBottom: '16px', 
+              marginBottom: '18px', 
               alignItems: 'flex-start' 
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <img 
                   src="/logoaujantravel.jpeg" 
                   alt="Logo" 
                   referrerPolicy="no-referrer"
-                  style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '50%', border: '2px solid #000000' }} 
+                  style={{ width: '54px', height: '54px', objectFit: 'cover', borderRadius: '50%', border: '2.5px solid #000000' }} 
                 />
                 <div>
-                  <h2 style={{ margin: 0, color: '#000000', fontSize: '22px', fontWeight: '900' }}>العوجان للسياحة</h2>
-                  <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold', letterSpacing: '0.5px' }}>INTERNATIONAL BOARDING PASS</p>
+                  <h2 style={{ 
+                    margin: '0 0 4px 0', 
+                    color: '#000000', 
+                    fontSize: '26px', 
+                    fontWeight: '900', 
+                    lineHeight: '1.25',
+                    letterSpacing: 'normal',
+                    fontFamily: "'Segoe UI', Tahoma, Arial, sans-serif"
+                  }}>
+                    العوجان للسياحة
+                  </h2>
+                  <p style={{ 
+                    margin: 0, 
+                    fontSize: '12px', 
+                    color: '#000000', 
+                    fontWeight: '900', 
+                    letterSpacing: '0.5px' 
+                  }}>
+                    INTERNATIONAL BOARDING PASS
+                  </p>
                 </div>
               </div>
               <div style={{ textAlign: 'left' }}>
-                <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#000000' }}>رقم التتبع: {tripObj?.trackingNumber || '---'}</p>
-                <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>CONFIRMED / مؤكد</p>
+                <p style={{ margin: 0, fontSize: '15px', fontWeight: '900', color: '#000000' }}>رقم التتبع: {tripObj?.trackingNumber || '---'}</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '14px', color: '#000000', fontWeight: '900' }}>CONFIRMED / مؤكد</p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '16px' }}>
               <div style={{ flex: 1.2 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>اسم المسافر</p>
-                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '15px', color: '#000000' }}>{booking.passengerName}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>اسم المسافر</p>
+                <p style={{ margin: '3px 0 0 0', fontWeight: '900', fontSize: '20px', color: '#000000' }}>{booking.passengerName}</p>
               </div>
               <div style={{ flex: 1.1 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم العميل / الهاتف</p>
-                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', color: '#000000', direction: 'ltr', textAlign: 'right' }}>{booking.passengerPhone || '---'}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>رقم العميل / الهاتف</p>
+                <p style={{ margin: '3px 0 0 0', fontWeight: '900', fontSize: '17px', color: '#000000', direction: 'ltr', textAlign: 'right' }}>{booking.passengerPhone || '---'}</p>
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الجواز</p>
-                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', color: '#000000' }}>{booking.passportNumber || '---'}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>رقم الجواز</p>
+                <p style={{ margin: '3px 0 0 0', fontWeight: '900', fontSize: '17px', color: '#000000' }}>{booking.passportNumber || '---'}</p>
               </div>
               <div style={{ flex: 0.9 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>رقم الحجز</p>
-                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', fontFamily: 'monospace', color: '#000000' }}>{booking.id.slice(0, 8)}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>رقم الحجز</p>
+                <p style={{ margin: '3px 0 0 0', fontWeight: '900', fontSize: '18px', fontFamily: 'monospace', color: '#000000' }}>{booking.id.slice(0, 8)}</p>
               </div>
             </div>
 
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: '20px', 
-              margin: '12px 0', 
+              gap: '24px', 
+              margin: '14px 0', 
               backgroundColor: '#ffffff', 
-              border: '2px solid #000000', 
-              padding: '10px 14px', 
-              borderRadius: '8px', 
+              border: '2.5px solid #000000', 
+              padding: '12px 18px', 
+              borderRadius: '10px', 
               boxSizing: 'border-box' 
             }}>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>من</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.from || tripObj?.from}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>من</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '24px', color: '#000000' }}>{booking.from || tripObj?.from}</p>
               </div>
-              <div style={{ color: '#000000', fontSize: '24px', fontWeight: '900' }}>←</div>
+              <div style={{ color: '#000000', fontSize: '30px', fontWeight: '900' }}>←</div>
               <div style={{ flex: 1, textAlign: 'left' }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '18px', color: '#000000' }}>{booking.to || tripObj?.to}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>إلى</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '24px', color: '#000000' }}>{booking.to || tripObj?.to}</p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '20px', marginTop: '12px' }}>
+            <div style={{ display: 'flex', gap: '24px', marginTop: '14px' }}>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{tripObj?.date}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>التاريخ</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '17px', color: '#000000' }}>{tripObj?.date}</p>
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>الوقت</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '13px', color: '#000000' }}>{tripObj?.time}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>الوقت</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '17px', color: '#000000' }}>{tripObj?.time}</p>
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: booking.seatNumber && booking.seatNumber > 0 ? '20px' : '15px', color: '#000000' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>المقعد</p>
+                <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: booking.seatNumber && booking.seatNumber > 0 ? '26px' : '19px', color: '#000000' }}>
                   {booking.seatNumber && booking.seatNumber > 0 ? booking.seatNumber : 'بدون تحديد'}
                 </p>
               </div>
               {!hidePrice ? (
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>سعر التذكرة</p>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>سعر التذكرة</p>
+                  <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '21px', color: '#000000' }}>
                     {booking.isFree ? 'مجاني (0)' : `${total} ${priceInfo.currency}`}
                   </p>
                   {extra > 0 && (
-                    <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#000000', fontWeight: 'bold' }}>
                       (يشمل {booking.extraParcelsCount} طرود: +{extra} {priceInfo.currency})
                     </p>
                   )}
                 </div>
               ) : (
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontSize: '10px', color: '#000000', fontWeight: 'bold' }}>حالة التذكرة</p>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000000' }}>مؤكدة</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#000000', fontWeight: '900' }}>حالة التذكرة</p>
+                  <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '21px', color: '#000000' }}>مؤكدة</p>
                   {booking.extraParcelsCount ? (
-                    <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#000000', fontWeight: 'bold' }}>
                       (طرود إضافية: {booking.extraParcelsCount})
                     </p>
                   ) : null}
@@ -409,10 +427,10 @@ export default function AdminDashboard() {
 
             {/* أرقام فروع العوجان للسياحة */}
             <div style={{ 
-              marginTop: '12px', 
-              padding: '8px 12px', 
-              border: '2px solid #000000', 
-              borderRadius: '8px', 
+              marginTop: '16px', 
+              padding: '10px 16px', 
+              border: '2.5px solid #000000', 
+              borderRadius: '10px', 
               backgroundColor: '#ffffff',
               boxSizing: 'border-box'
             }}>
@@ -421,19 +439,19 @@ export default function AdminDashboard() {
                 justifyContent: 'space-between', 
                 alignItems: 'center'
               }}>
-                <div style={{ fontSize: '11px', fontWeight: '900', color: '#000000' }}>
+                <div style={{ fontSize: '14px', fontWeight: '900', color: '#000000' }}>
                   📞 أرقام الفروع:
                 </div>
-                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                  <div style={{ fontSize: '11px', color: '#000000', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
+                  <div style={{ fontSize: '14px', color: '#000000', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <span style={{ fontWeight: '900' }}>الرياض:</span>
                     <span style={{ fontWeight: '900' }}>٠٥٠٠٠٩٤٢١٠</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#000000', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ fontSize: '14px', color: '#000000', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <span style={{ fontWeight: '900' }}>جدة:</span>
                     <span style={{ fontWeight: '900' }}>٠٥٣١١٦٠٠٧٩</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#000000', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ fontSize: '14px', color: '#000000', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <span style={{ fontWeight: '900' }}>سوريا:</span>
                     <span style={{ fontWeight: '900' }}>٠٩٤٣٠١٣١١٣</span>
                   </div>
@@ -445,55 +463,55 @@ export default function AdminDashboard() {
           {/* Stub Part */}
           <div style={{ 
             flex: 1, 
-            padding: '16px', 
+            padding: '20px 18px', 
             backgroundColor: '#ffffff', 
             textAlign: 'right',
             boxSizing: 'border-box'
           }}>
-            <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '1.5px solid #000000', paddingBottom: '6px' }}>
-              <p style={{ margin: 0, fontSize: '11px', fontWeight: '900', color: '#000000' }}>بطاقة صعود</p>
-              <p style={{ margin: 0, fontSize: '9px', color: '#000000', fontWeight: 'bold' }}>نسخة المسافر</p>
+            <div style={{ textAlign: 'center', marginBottom: '12px', borderBottom: '2px solid #000000', paddingBottom: '8px' }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: '900', color: '#000000' }}>بطاقة صعود</p>
+              <p style={{ margin: '2px 0 0 0', fontSize: '11.5px', color: '#000000', fontWeight: '900' }}>نسخة المسافر</p>
             </div>
-            <div style={{ marginBottom: '6px' }}>
-              <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>الاسم</p>
-              <p style={{ margin: 0, fontWeight: '900', fontSize: '11px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.passengerName}</p>
+            <div style={{ marginBottom: '8px' }}>
+              <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>الاسم</p>
+              <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '14px', color: '#000000', lineHeight: '1.4' }}>{booking.passengerName}</p>
             </div>
-            <div style={{ marginBottom: '6px' }}>
-              <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>رقم العميل</p>
-              <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.passengerPhone || '---'}</p>
+            <div style={{ marginBottom: '8px' }}>
+              <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>رقم العميل</p>
+              <p style={{ margin: '2px 0 0 0', fontWeight: '900', fontSize: '13px', color: '#000000', lineHeight: '1.4' }}>{booking.passengerPhone || '---'}</p>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div>
-                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>من</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.from || tripObj?.from}</p>
+                <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>من</p>
+                <p style={{ margin: '1px 0 0 0', fontWeight: '900', fontSize: '13px', color: '#000000' }}>{booking.from || tripObj?.from}</p>
               </div>
               <div>
-                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>إلى</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{booking.to || tripObj?.to}</p>
+                <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>إلى</p>
+                <p style={{ margin: '1px 0 0 0', fontWeight: '900', fontSize: '13px', color: '#000000' }}>{booking.to || tripObj?.to}</p>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div>
-                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>التاريخ</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>{tripObj?.date}</p>
+                <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>التاريخ</p>
+                <p style={{ margin: '1px 0 0 0', fontWeight: '900', fontSize: '13px', color: '#000000' }}>{tripObj?.date}</p>
               </div>
               <div>
-                <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>المقعد</p>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: booking.seatNumber && booking.seatNumber > 0 ? '13px' : '9px', color: '#000000' }}>
+                <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>المقعد</p>
+                <p style={{ margin: '1px 0 0 0', fontWeight: '900', fontSize: booking.seatNumber && booking.seatNumber > 0 ? '17px' : '12px', color: '#000000' }}>
                   {booking.seatNumber && booking.seatNumber > 0 ? booking.seatNumber : 'بدون تحديد'}
                 </p>
               </div>
               {!hidePrice ? (
                 <div>
-                  <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>السعر</p>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>السعر</p>
+                  <p style={{ margin: '1px 0 0 0', fontWeight: '900', fontSize: '13px', color: '#000000' }}>
                     {booking.isFree ? 'مجاني' : `${total} ${priceInfo.currency}`}
                   </p>
                 </div>
               ) : (
                 <div>
-                  <p style={{ margin: 0, fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>الحالة</p>
-                  <p style={{ margin: 0, fontWeight: '900', fontSize: '10px', color: '#000000' }}>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#000000', fontWeight: '900' }}>الحالة</p>
+                  <p style={{ margin: '1px 0 0 0', fontWeight: '900', fontSize: '13px', color: '#000000' }}>
                     مؤكد
                   </p>
                 </div>
@@ -501,25 +519,25 @@ export default function AdminDashboard() {
             </div>
             {/* أرقام الفروع على قسيمة الراكب */}
             <div style={{ 
-              marginTop: '6px', 
-              padding: '5px 4px', 
-              border: '1.5px solid #000000', 
-              borderRadius: '6px', 
+              marginTop: '8px', 
+              padding: '6px 5px', 
+              border: '2px solid #000000', 
+              borderRadius: '8px', 
               textAlign: 'center',
               backgroundColor: '#ffffff'
             }}>
-              <p style={{ margin: '0 0 2px 0', fontSize: '8px', fontWeight: '900', color: '#000000' }}>أرقام الفروع</p>
-              <p style={{ margin: '1px 0', fontSize: '7.5px', fontWeight: '900', color: '#000000' }}>الرياض: ٠٥٠٠٠٩٤٢١٠</p>
-              <p style={{ margin: '1px 0', fontSize: '7.5px', fontWeight: '900', color: '#000000' }}>جدة: ٠٥٣١١٦٠٠٧٩</p>
-              <p style={{ margin: '1px 0', fontSize: '7.5px', fontWeight: '900', color: '#000000' }}>سوريا: ٠٩٤٣٠١٣١١٣</p>
+              <p style={{ margin: '0 0 3px 0', fontSize: '10.5px', fontWeight: '900', color: '#000000' }}>أرقام الفروع</p>
+              <p style={{ margin: '1px 0', fontSize: '10px', fontWeight: '900', color: '#000000' }}>الرياض: ٠٥٠٠٠٩٤٢١٠</p>
+              <p style={{ margin: '1px 0', fontSize: '10px', fontWeight: '900', color: '#000000' }}>جدة: ٠٥٣١١٦٠٠٧٩</p>
+              <p style={{ margin: '1px 0', fontSize: '10px', fontWeight: '900', color: '#000000' }}>سوريا: ٠٩٤٣٠١٣١١٣</p>
             </div>
-            <div style={{ marginTop: '8px', textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2px', height: '24px', padding: '2px 0' }}>
+            <div style={{ marginTop: '10px', textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '3px', height: '28px', padding: '2px 0' }}>
                 {[4,2,3,1,4,2,1,3,2,4,1,2,3,2,1,4,3,1,2,4,2,1,3,2,4,1,3].map((w, bi) => (
                   <div key={bi} style={{ width: `${w}px`, height: '100%', backgroundColor: '#000000' }} />
                 ))}
               </div>
-              <p style={{ margin: '3px 0 0 0', fontSize: '8px', fontFamily: 'monospace', color: '#000000', fontWeight: '900' }}>{booking.id.slice(0, 10).toUpperCase()}</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '11px', fontFamily: 'monospace', color: '#000000', fontWeight: '900' }}>{booking.id.slice(0, 10).toUpperCase()}</p>
             </div>
           </div>
         </div>
@@ -553,6 +571,8 @@ export default function AdminDashboard() {
               background-image: none !important;
               text-shadow: none !important;
               box-shadow: none !important;
+              letter-spacing: normal !important;
+              font-family: 'Segoe UI', Tahoma, Arial, 'Traditional Arabic', sans-serif !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
@@ -573,12 +593,13 @@ export default function AdminDashboard() {
               <title>طباعة تذكرة ${hidePrice ? '(بدون سعر) ' : ''}- ${booking.passengerName}</title>
               <style>
                 @media print {
-                  @page { size: auto; margin: 8mm; }
+                  @page { size: auto; margin: 5mm; }
                   body { margin: 0; padding: 0; background: #ffffff !important; }
+                  img { width: 100% !important; max-width: 100% !important; }
                 }
                 body {
                   margin: 0;
-                  padding: 20px;
+                  padding: 10px;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
@@ -588,7 +609,8 @@ export default function AdminDashboard() {
                   font-family: Arial, sans-serif;
                 }
                 img {
-                  max-width: 100%;
+                  width: 100%;
+                  max-width: 1040px;
                   height: auto;
                   display: block;
                   margin: 0 auto;
@@ -695,6 +717,8 @@ export default function AdminDashboard() {
               background-image: none !important;
               text-shadow: none !important;
               box-shadow: none !important;
+              letter-spacing: normal !important;
+              font-family: 'Segoe UI', Tahoma, Arial, 'Traditional Arabic', sans-serif !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
@@ -772,64 +796,64 @@ export default function AdminDashboard() {
 
   const generateParcelInvoiceHtml = (parcel: Parcel, trip?: Trip) => {
     return `
-      <div style="max-width: 800px; margin: auto; padding: 20px; border: 2px solid #000000; font-size: 14px; line-height: 1.4; border-radius: 8px; color: #000000; background: #ffffff; direction: rtl; font-family: Arial, sans-serif; box-sizing: border-box;">
-        <div style="border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; color: #000000;">
-          <div style="display: flex; align-items: center; gap: 15px;">
+      <div style="max-width: 1020px; width: 100%; margin: auto; padding: 28px 30px; border: 2.5px solid #000000; font-size: 16px; line-height: 1.5; border-radius: 12px; color: #000000; background: #ffffff; direction: rtl; font-family: Arial, sans-serif; box-sizing: border-box;">
+        <div style="border-bottom: 2.5px solid #000000; padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; color: #000000;">
+          <div style="display: flex; align-items: center; gap: 18px;">
             <img 
               src="/logoaujantravel.jpeg" 
               crossorigin="anonymous"
-              style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 1.5px solid #000000;"
+              style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #000000;"
             />
             <div>
-              <h1 style="margin: 0; color: #000000; font-size: 20px; font-weight: 900;">العوجان للسياحة والسفر</h1>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #000000; font-weight: 900;">خدمات شحن الطرود - تذكرة الشحن</p>
+              <h1 style="margin: 0 0 4px 0; color: #000000; font-size: 26px; font-weight: 900; letter-spacing: normal; line-height: 1.3; font-family: 'Segoe UI', Tahoma, Arial, sans-serif;">العوجان للسياحة والسفر</h1>
+              <p style="margin: 3px 0 0 0; font-size: 16px; color: #000000; font-weight: 900;">خدمات شحن الطرود - تذكرة الشحن</p>
             </div>
           </div>
           <div style="text-align: left;">
-            <p style="margin: 2px 0; font-size: 13px; color: #000000;"><strong>رقم بوليصة الشحن:</strong> ${parcel.waybillNumber}</p>
-            <p style="margin: 2px 0; font-size: 13px; color: #000000;"><strong>رقم تتبع الرحلة:</strong> <span style="color: #000000; font-weight: 900;">${trip?.trackingNumber || '---'}</span></p>
-            <p style="margin: 2px 0; font-size: 13px; color: #000000;"><strong>التاريخ:</strong> ${new Date(parcel.createdAt).toLocaleDateString('ar-EG')}</p>
+            <p style="margin: 3px 0; font-size: 16px; color: #000000; font-weight: 900;"><strong>رقم بوليصة الشحن:</strong> ${parcel.waybillNumber}</p>
+            <p style="margin: 3px 0; font-size: 16px; color: #000000; font-weight: 900;"><strong>رقم تتبع الرحلة:</strong> <span style="color: #000000; font-weight: 900;">${trip?.trackingNumber || '---'}</span></p>
+            <p style="margin: 3px 0; font-size: 15px; color: #000000; font-weight: 900;"><strong>التاريخ:</strong> ${new Date(parcel.createdAt).toLocaleDateString('ar-EG')}</p>
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; color: #000000;">
-          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
-            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">معلومات المرسل</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الاسم:</span> ${parcel.senderName}</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الهاتف:</span> ${parcel.senderPhone}</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; color: #000000;">
+          <div style="border: 2px solid #000000; padding: 14px 16px; border-radius: 8px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 2px solid #000000; margin-bottom: 8px; padding-bottom: 4px; font-size: 16.5px;">معلومات المرسل</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الاسم:</span> ${parcel.senderName}</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الهاتف:</span> ${parcel.senderPhone}</div>
           </div>
-          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
-            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">معلومات المستلم</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الاسم:</span> ${parcel.receiverName}</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الهاتف:</span> ${parcel.receiverPhone}</div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; color: #000000;">
-          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
-            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">مسار الشحنة</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">من:</span> ${parcel.from}</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">إلى:</span> ${parcel.to}</div>
-          </div>
-          <div style="border: 1.5px solid #000000; padding: 10px; border-radius: 6px;">
-            <div style="font-weight: 900; color: #000000; border-bottom: 1.5px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px;">تفاصيل إضافية</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">ملاحظات:</span> ${parcel.note || '---'}</div>
-            <div style="margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الحالة:</span> ${parcel.status === 'pending' ? 'قيد الانتظار' : parcel.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</div>
+          <div style="border: 2px solid #000000; padding: 14px 16px; border-radius: 8px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 2px solid #000000; margin-bottom: 8px; padding-bottom: 4px; font-size: 16.5px;">معلومات المستلم</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الاسم:</span> ${parcel.receiverName}</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الهاتف:</span> ${parcel.receiverPhone}</div>
           </div>
         </div>
 
-        <div style="margin-top: 15px; padding: 12px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; text-align: left; display: flex; justify-content: space-between; align-items: center; color: #000000;">
-          <span style="font-size: 14px; margin: 0; font-weight: 900; color: #000000;">إجمالي تكلفة الشحن:</span>
-          <div style="font-size: 18px; font-weight: 900; color: #000000; margin: 0;">${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; color: #000000;">
+          <div style="border: 2px solid #000000; padding: 14px 16px; border-radius: 8px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 2px solid #000000; margin-bottom: 8px; padding-bottom: 4px; font-size: 16.5px;">مسار الشحنة</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">من:</span> ${parcel.from}</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">إلى:</span> ${parcel.to}</div>
+          </div>
+          <div style="border: 2px solid #000000; padding: 14px 16px; border-radius: 8px;">
+            <div style="font-weight: 900; color: #000000; border-bottom: 2px solid #000000; margin-bottom: 8px; padding-bottom: 4px; font-size: 16.5px;">تفاصيل إضافية</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">ملاحظات:</span> ${parcel.note || '---'}</div>
+            <div style="margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold;"><span style="font-weight: 900;">الحالة:</span> ${parcel.status === 'pending' ? 'قيد الانتظار' : parcel.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 18px; padding: 14px 18px; background: #ffffff; border: 2.5px solid #000000; border-radius: 10px; text-align: left; display: flex; justify-content: space-between; align-items: center; color: #000000;">
+          <span style="font-size: 17px; margin: 0; font-weight: 900; color: #000000;">إجمالي تكلفة الشحن:</span>
+          <div style="font-size: 24px; font-weight: 900; color: #000000; margin: 0;">${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}</div>
         </div>
 
         <!-- أرقام فروع الشحن -->
-        <div style="margin-top: 15px; padding: 10px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; color: #000000;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <div style="font-weight: 900; font-size: 13px; color: #000000;">
+        <div style="margin-top: 18px; padding: 12px 18px; background: #ffffff; border: 2.5px solid #000000; border-radius: 10px; color: #000000;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="font-weight: 900; font-size: 16px; color: #000000;">
               📞 أرقام فروع الشحن:
             </div>
-            <div style="display: flex; gap: 20px; align-items: center; font-size: 13px; font-weight: 900; color: #000000;">
+            <div style="display: flex; gap: 24px; align-items: center; font-size: 16px; font-weight: 900; color: #000000;">
               <span>الرياض: ٠٥٠٠٠٩٤٢١٠</span>
               <span>جدة: ٠٥٣١١٦٠٠٧٩</span>
               <span>سوريا: ٠٩٨٩٨٨٩٠٩٢</span>
@@ -837,24 +861,24 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div style="margin-top: 18px; border: 1.5px solid #000000; border-radius: 8px; padding: 12px; background: #ffffff; font-size: 11px; color: #000000; line-height: 1.8; text-align: right;">
-          <div style="font-size: 12px; font-weight: 900; color: #000000; margin-bottom: 6px; border-bottom: 1.5px solid #000000; padding-bottom: 3px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
-          <ul style="padding-right: 15px; margin: 0; list-style-type: none; color: #000000;">
-            <li style="margin-bottom: 4px;">* الشركة غير مسؤولة عن البضائع إذا لم يتم إستلامها خلال ١٠ أيام وعن سندات الاستلام بعد ١٥ يوم من تاريخ الاستلام.</li>
-            <li style="margin-bottom: 4px;">* الشركة غير مسؤولة عما بداخل الإرساليه من أشياء قابله للكسر أو ثمينة بدون تأمين من قبلنا.</li>
-            <li style="margin-bottom: 4px;">* في حالة فقدان الارسالية الشركة لا تتحمل أكثر من ١٠٠ ريال كقيمة الارسالية إذا لم يتم تأمين عليه من قبلنا.</li>
-            <li style="margin-bottom: 4px;">• استلامك الفاتورة يعتبر إطلاعك على الشروط.</li>
-            <li style="margin-bottom: 4px;">* الشركة لا تتحمل مسؤولية الإرسالية في حالة تعرضها لكوارث طبيعية ولم يكتب عليها الاسم أو رقم التواصل.</li>
-            <li style="margin-bottom: 4px;">* الشركة غير مسؤولة عن مابداخل الإرسالية الغير مصرح بها.</li>
+        <div style="margin-top: 20px; border: 2px solid #000000; border-radius: 10px; padding: 16px; background: #ffffff; font-size: 13.5px; color: #000000; line-height: 1.8; text-align: right; font-weight: bold;">
+          <div style="font-size: 15px; font-weight: 900; color: #000000; margin-bottom: 8px; border-bottom: 2px solid #000000; padding-bottom: 4px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
+          <ul style="padding-right: 18px; margin: 0; list-style-type: none; color: #000000;">
+            <li style="margin-bottom: 5px;">* الشركة غير مسؤولة عن البضائع إذا لم يتم إستلامها خلال ١٠ أيام وعن سندات الاستلام بعد ١٥ يوم من تاريخ الاستلام.</li>
+            <li style="margin-bottom: 5px;">* الشركة غير مسؤولة عما بداخل الإرساليه من أشياء قابله للكسر أو ثمينة بدون تأمين من قبلنا.</li>
+            <li style="margin-bottom: 5px;">* في حالة فقدان الارسالية الشركة لا تتحمل أكثر من ١٠٠ ريال كقيمة الارسالية إذا لم يتم تأمين عليه من قبلنا.</li>
+            <li style="margin-bottom: 5px;">• استلامك الفاتورة يعتبر إطلاعك على الشروط.</li>
+            <li style="margin-bottom: 5px;">* الشركة لا تتحمل مسؤولية الإرسالية في حالة تعرضها لكوارث طبيعية ولم يكتب عليها الاسم أو رقم التواصل.</li>
+            <li style="margin-bottom: 5px;">* الشركة غير مسؤولة عن مابداخل الإرسالية الغير مصرح بها.</li>
           </ul>
         </div>
 
-        <div style="margin-top: 15px; text-align: center; font-size: 11px; color: #000000; border-top: 2px solid #000000; padding-top: 10px; font-weight: bold;">
-          <div style="margin-bottom: 6px; font-size: 12px; font-weight: 900; color: #000000;">
+        <div style="margin-top: 18px; text-align: center; font-size: 13.5px; color: #000000; border-top: 2px solid #000000; padding-top: 12px; font-weight: bold;">
+          <div style="margin-bottom: 8px; font-size: 15px; font-weight: 900; color: #000000;">
             أرقام فروع الشحن: الرياض: ٠٥٠٠٠٩٤٢١٠ | جدة: ٠٥٣١١٦٠٠٧٩ | سوريا: ٠٩٨٩٨٨٩٠٩٢
           </div>
-          <p style="margin: 3px 0; color: #000000;">شكراً لتعاملكم معنا. يرجى الاحتفاظ بهذه التذكرة لتتبع شحنتكم.</p>
-          <p style="margin: 3px 0; color: #000000;">هذه الوثيقة صدرت إلكترونياً ولا تحتاج لختم.</p>
+          <p style="margin: 4px 0; color: #000000;">شكراً لتعاملكم معنا. يرجى الاحتفاظ بهذه التذكرة لتتبع شحنتكم.</p>
+          <p style="margin: 4px 0; color: #000000;">هذه الوثيقة صدرت إلكترونياً ولا تحتاج لختم.</p>
         </div>
       </div>
     `;
@@ -869,7 +893,7 @@ export default function AdminDashboard() {
       tempContainer.style.position = 'fixed';
       tempContainer.style.left = '-9999px';
       tempContainer.style.top = '0';
-      tempContainer.style.width = '780px';
+      tempContainer.style.width = '1020px';
       tempContainer.style.backgroundColor = '#ffffff';
       tempContainer.style.zIndex = '-9999';
       tempContainer.innerHTML = generateParcelInvoiceHtml(parcel, trip);
@@ -995,12 +1019,14 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
             }
             body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; color: #000000; }
             .page { min-height: 100%; box-sizing: border-box; padding-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th, td { border: 1.5px solid #000000; padding: 4px 6px; text-align: right; color: #000000; }
-            th { background-color: #ffffff; color: #000000; font-weight: 900; border-bottom: 2px solid #000000; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13.5px; }
+            th, td { border: 1.5px solid #000000; padding: 6px 8px; text-align: right; color: #000000; font-weight: bold; }
+            th { background-color: #ffffff; color: #000000; font-weight: 900; font-size: 14px; border-bottom: 2.5px solid #000000; }
             .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000000; padding-bottom: 10px; position: relative; color: #000000; }
-            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #ffffff; border: 1.5px solid #000000; padding: 8px; border-radius: 6px; color: #000000; }
-            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #000000; font-weight: bold; }
+            .header h1 { margin: 0; font-size: 22px; font-weight: 900; }
+            .header p { margin: 3px 0 0 0; font-size: 13px; font-weight: bold; }
+            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; font-size: 14px; background: #ffffff; border: 2px solid #000000; padding: 10px; border-radius: 8px; color: #000000; font-weight: bold; }
+            .footer { margin-top: 16px; text-align: center; font-size: 12px; color: #000000; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -1010,10 +1036,10 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                 <img 
                   src="/logoaujantravel.jpeg" 
                   crossorigin="anonymous"
-                  style="position: absolute; top: 0; right: 0; width: 45px; height: 45px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+                  style="position: absolute; top: 0; right: 0; width: 50px; height: 50px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
                 />
-                <h1 style="margin: 0; font-size: 18px;">كشف ركاب الرحلة (صفحة ${chunkIndex + 1} من ${chunks.length})</h1>
-                <p style="margin: 3px 0 0 0; font-size: 11px;">العوجان للسياحة والسفر</p>
+                <h1>كشف ركاب الرحلة (صفحة ${chunkIndex + 1} من ${chunks.length})</h1>
+                <p>العوجان للسياحة والسفر</p>
               </div>
               <div class="trip-info">
                 <div><strong>من:</strong> ${trip.from}</div>
@@ -1124,9 +1150,9 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
     if (hasSYP) totalTextParts.push(`${totalSYP} ل.س`);
     const totalText = totalTextParts.join(' / ') || '0';
 
-    // Chunk into pages of 45 passengers
+    // Chunk into pages of 35 passengers for larger readability
     const chunks = [];
-    const chunkSize = 45;
+    const chunkSize = 35;
     for (let i = 0; i < tripBookings.length; i += chunkSize) {
       chunks.push(tripBookings.slice(i, i + chunkSize));
     }
@@ -1142,13 +1168,13 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
             }
             body { font-family: 'Arial', sans-serif; padding: 20px; margin: 0; color: #000000; }
             .page { min-height: 100%; box-sizing: border-box; padding-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th, td { border: 1.5px solid #000000; padding: 4px 6px; text-align: right; color: #000000; }
-            th { background-color: #ffffff; color: #000000; font-weight: 900; border-bottom: 2px solid #000000; }
-            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000000; padding-bottom: 10px; position: relative; color: #000000; }
-            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; font-size: 12px; background: #ffffff; border: 1.5px solid #000000; padding: 8px; border-radius: 6px; color: #000000; }
-            .summary-box { background-color: #ffffff; border: 2px solid #000000; padding: 8px 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; font-weight: bold; color: #000000; display: flex; justify-content: space-between; }
-            .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #000000; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13.5px; }
+            th, td { border: 1.5px solid #000000; padding: 6px 8px; text-align: right; color: #000000; font-weight: bold; }
+            th { background-color: #ffffff; color: #000000; font-weight: 900; font-size: 14px; border-bottom: 2.5px solid #000000; }
+            .header { text-align: center; margin-bottom: 15px; border-bottom: 2.5px solid #000000; padding-bottom: 12px; position: relative; color: #000000; }
+            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; font-size: 14px; background: #ffffff; border: 2px solid #000000; padding: 10px; border-radius: 8px; color: #000000; font-weight: bold; }
+            .summary-box { background-color: #ffffff; border: 2.5px solid #000000; padding: 12px 18px; border-radius: 8px; margin-top: 15px; font-size: 16.5px; font-weight: 900; color: #000000; display: flex; justify-content: space-between; }
+            .footer { margin-top: 16px; text-align: center; font-size: 12px; color: #000000; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -1160,10 +1186,10 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                   <img 
                     src="/logoaujantravel.jpeg" 
                     crossorigin="anonymous"
-                    style="position: absolute; top: 0; right: 0; width: 45px; height: 45px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1px solid #ddd;"
+                    style="position: absolute; top: 0; right: 0; width: 52px; height: 52px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 2px solid #000000;"
                   />
-                  <h1 style="margin: 0; font-size: 18px;">الكشف المالي والركاب للرحلة (صفحة ${chunkIndex + 1} من ${chunks.length})</h1>
-                  <p style="margin: 3px 0 0 0; font-size: 11px;">العوجان للسياحة والسفر</p>
+                  <h1 style="margin: 0; font-size: 22px; font-weight: 900;">الكشف المالي والركاب للرحلة (صفحة ${chunkIndex + 1} من ${chunks.length})</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">العوجان للسياحة والسفر</p>
                 </div>
                 <div class="trip-info">
                   <div><strong>من:</strong> ${trip.from}</div>
@@ -1194,15 +1220,15 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                       return `
                         <tr>
                           <td>${absoluteIndex + 1}</td>
-                          <td>${b.passengerName} ${b.isFree ? '<span style="color: #2563eb; font-weight: bold;">(مجاني)</span>' : ''}</td>
+                          <td>${b.passengerName} ${b.isFree ? '<span style="color: #2563eb; font-weight: 900;">(مجاني)</span>' : ''}</td>
                           <td>${b.passengerPhone}</td>
                           <td>${b.passportNumber || '---'}</td>
                           <td>${b.seatNumber && b.seatNumber > 0 ? b.seatNumber : 'بدون تحديد'}</td>
                           <td>${b.to || trip.to}</td>
                           <td>${b.extraParcelsCount ? `${b.extraParcelsCount} طرود (+${priceInfo.extra} ${priceInfo.currency})` : '---'}</td>
-                          <td style="font-weight: bold; color: ${b.isFree ? '#2563eb' : '#059669'};">
+                          <td style="font-weight: 900; font-size: 14.5px; color: ${b.isFree ? '#2563eb' : '#059669'};">
                             ${b.isFree ? (priceInfo.extra > 0 ? `مجاني (+${priceInfo.extra} طرود)` : `مجاني (0 ${priceInfo.currency})`) : `${priceInfo.totalValue} ${priceInfo.currency}`}
-                            ${!b.isFree && priceInfo.extra > 0 ? `<div style="font-size: 9px; color: #666; font-weight: normal;">(أساسي: ${priceInfo.baseValue} + طرود: ${priceInfo.extra})</div>` : ''}
+                            ${!b.isFree && priceInfo.extra > 0 ? `<div style="font-size: 11px; color: #333; font-weight: bold;">(أساسي: ${priceInfo.baseValue} + طرود: ${priceInfo.extra})</div>` : ''}
                           </td>
                           <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
                         </tr>
@@ -1214,7 +1240,7 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                 ${isLastPage ? `
                   <div class="summary-box">
                     <span>إجمالي مبالغ الرحلة:</span>
-                    <span>${totalText}</span>
+                    <span style="font-size: 18px;">${totalText}</span>
                   </div>
                 ` : ''}
 
@@ -1262,14 +1288,16 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
         <head>
           <title>كشف شحنات الرحلة - ${trip.from} إلى ${trip.to}</title>
           <style>
-            body { font-family: 'Arial', sans-serif; padding: 40px; color: #000000; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1.5px solid #000000; padding: 12px; text-align: right; font-size: 14px; color: #000000; }
-            th { background-color: #ffffff; color: #000000; font-weight: 900; border-bottom: 2px solid #000000; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000000; padding-bottom: 20px; color: #000000; }
-            .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 14px; border: 1.5px solid #000000; padding: 14px; border-radius: 6px; color: #000000; }
-            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #000000; font-weight: bold; }
-            .price-total { text-align: left; margin-top: 20px; font-weight: 900; font-size: 16px; color: #000000; }
+            body { font-family: 'Arial', sans-serif; padding: 30px; color: #000000; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+            th, td { border: 2px solid #000000; padding: 14px 12px; text-align: right; font-size: 16px; font-weight: bold; color: #000000; }
+            th { background-color: #ffffff; color: #000000; font-weight: 900; font-size: 16.5px; border-bottom: 2.5px solid #000000; }
+            .header { text-align: center; margin-bottom: 25px; border-bottom: 2.5px solid #000000; padding-bottom: 20px; color: #000000; }
+            .header h1 { font-size: 28px; margin: 0; font-weight: 900; }
+            .header p { font-size: 17px; margin: 4px 0 0 0; font-weight: 900; }
+            .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 16px; font-weight: bold; border: 2px solid #000000; padding: 16px; border-radius: 8px; color: #000000; }
+            .footer { margin-top: 30px; text-align: center; font-size: 14px; color: #000000; font-weight: bold; }
+            .price-total { text-align: left; margin-top: 24px; font-weight: 900; font-size: 19px; color: #000000; }
           </style>
         </head>
         <body>
@@ -1883,23 +1911,24 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
             }
             @page {
               size: A4 portrait;
-              margin: 8mm;
+              margin: 6mm;
             }
             body { font-family: 'Arial', sans-serif; padding: 15px; color: #000000; background: #fff; margin: 0; }
-            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 2px solid #000000; box-shadow: none; font-size: 14px; line-height: 1.4; border-radius: 8px; color: #000000; }
-            .header { border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; color: #000000; }
-            .company-info h1 { margin: 0; color: #000000; font-size: 20px; font-weight: 900; }
-            .company-info p { margin: 2px 0 0 0; font-size: 13px; color: #000000; font-weight: 900; }
-            .tracking p { margin: 2px 0; font-size: 13px; color: #000000; }
-            .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; color: #000000; }
-            .section-title { font-weight: 900; color: #000000; border-bottom: 2px solid #000000; margin-bottom: 6px; padding-bottom: 3px; font-size: 13px; }
-            .info-row { margin-bottom: 4px; font-size: 12px; color: #000000; font-weight: bold; }
+            .invoice-box { max-width: 1020px; width: 100%; margin: auto; padding: 28px 30px; border: 2.5px solid #000000; box-shadow: none; font-size: 16px; line-height: 1.5; border-radius: 12px; color: #000000; box-sizing: border-box; }
+            .header { border-bottom: 2.5px solid #000000; padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; color: #000000; }
+            .company-info h1 { margin: 0 0 4px 0; color: #000000; font-size: 26px; font-weight: 900; letter-spacing: normal; line-height: 1.3; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+            .company-info p { margin: 3px 0 0 0; font-size: 16px; color: #000000; font-weight: 900; }
+            .tracking p { margin: 3px 0; font-size: 16px; color: #000000; font-weight: 900; }
+            .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; color: #000000; }
+            .section-box { border: 2px solid #000000; padding: 14px 16px; border-radius: 8px; }
+            .section-title { font-weight: 900; color: #000000; border-bottom: 2px solid #000000; margin-bottom: 8px; padding-bottom: 4px; font-size: 16.5px; }
+            .info-row { margin-bottom: 5px; font-size: 15.5px; color: #000000; font-weight: bold; }
             .info-label { font-weight: 900; color: #000000; }
-            .price-section { margin-top: 15px; padding: 12px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; text-align: left; display: flex; justify-content: space-between; align-items: center; color: #000000; }
-            .price-section .info-label { font-size: 13px; margin: 0; font-weight: 900; color: #000000; }
-            .total-price { font-size: 18px; font-weight: 900; color: #000000; margin: 0; }
-            .branches-section { margin-top: 15px; padding: 10px 15px; background: #ffffff; border: 2px solid #000000; border-radius: 8px; color: #000000; }
-            .footer { margin-top: 15px; text-align: center; font-size: 11px; color: #000000; border-top: 2px solid #000000; padding-top: 10px; font-weight: bold; }
+            .price-section { margin-top: 18px; padding: 14px 18px; background: #ffffff; border: 2.5px solid #000000; border-radius: 10px; text-align: left; display: flex; justify-content: space-between; align-items: center; color: #000000; }
+            .price-section .info-label { font-size: 17px; margin: 0; font-weight: 900; color: #000000; }
+            .total-price { font-size: 24px; font-weight: 900; color: #000000; margin: 0; }
+            .branches-section { margin-top: 18px; padding: 12px 18px; background: #ffffff; border: 2.5px solid #000000; border-radius: 10px; color: #000000; }
+            .footer { margin-top: 18px; text-align: center; font-size: 13.5px; color: #000000; border-top: 2.5px solid #000000; padding-top: 12px; font-weight: bold; }
             @media print {
               * {
                 color: #000000 !important;
@@ -1908,28 +1937,28 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
               }
               .no-print { display: none; }
               body { padding: 0; margin: 0; color: #000000 !important; }
-              .invoice-box { padding: 10px; border: 2px solid #000000; box-shadow: none; max-width: 100%; }
+              .invoice-box { padding: 16px; border: 2.5px solid #000000; box-shadow: none; max-width: 100% !important; width: 100% !important; }
               @page {
                 size: A4 portrait;
                 margin: 5mm;
               }
-              .terms-section { font-size: 9px !important; line-height: 1.4 !important; padding: 6px !important; margin-top: 10px !important; border: 1.5px solid #000000 !important; }
-              .price-section { padding: 8px 12px; margin-top: 10px; border: 2px solid #000000 !important; }
-              .branches-section { padding: 8px 12px; margin-top: 10px; border: 2px solid #000000 !important; }
-              .invoice-details { margin-bottom: 8px; gap: 10px; }
-              .header { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #000000 !important; }
-              .footer { margin-top: 8px; padding-top: 6px; border-top: 2px solid #000000 !important; }
+              .terms-section { font-size: 11.5px !important; line-height: 1.6 !important; padding: 10px !important; margin-top: 12px !important; border: 2px solid #000000 !important; font-weight: bold !important; }
+              .price-section { padding: 10px 16px; margin-top: 12px; border: 2.5px solid #000000 !important; }
+              .branches-section { padding: 10px 16px; margin-top: 12px; border: 2.5px solid #000000 !important; }
+              .invoice-details { margin-bottom: 12px; gap: 14px; }
+              .header { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2.5px solid #000000 !important; }
+              .footer { margin-top: 12px; padding-top: 8px; border-top: 2.5px solid #000000 !important; }
             }
           </style>
         </head>
         <body>
           <div class="invoice-box">
             <div class="header">
-              <div class="company-info" style="display: flex; align-items: center; gap: 15px;">
+              <div class="company-info" style="display: flex; align-items: center; gap: 18px;">
                 <img 
                   src="/logoaujantravel.jpeg" 
                   crossorigin="anonymous"
-                  style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 1.5px solid #000000;"
+                  style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; print-color-adjust: exact; -webkit-print-color-adjust: exact; border: 2px solid #000000;"
                 />
                 <div>
                   <h1>العوجان للسياحة والسفر</h1>
@@ -1944,12 +1973,12 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
             </div>
 
             <div class="invoice-details">
-              <div>
+              <div class="section-box">
                 <div class="section-title">معلومات المرسل</div>
                 <div class="info-row"><span class="info-label">الاسم:</span> ${parcel.senderName}</div>
                 <div class="info-row"><span class="info-label">الهاتف:</span> ${parcel.senderPhone}</div>
               </div>
-              <div>
+              <div class="section-box">
                 <div class="section-title">معلومات المستلم</div>
                 <div class="info-row"><span class="info-label">الاسم:</span> ${parcel.receiverName}</div>
                 <div class="info-row"><span class="info-label">الهاتف:</span> ${parcel.receiverPhone}</div>
@@ -1957,12 +1986,12 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
             </div>
 
             <div class="invoice-details">
-              <div>
+              <div class="section-box">
                 <div class="section-title">مسار الشحنة</div>
                 <div class="info-row"><span class="info-label">من:</span> ${parcel.from}</div>
                 <div class="info-row"><span class="info-label">إلى:</span> ${parcel.to}</div>
               </div>
-              <div>
+              <div class="section-box">
                 <div class="section-title">تفاصيل إضافية</div>
                 <div class="info-row"><span class="info-label">ملاحظات:</span> ${parcel.note || '---'}</div>
                 <div class="info-row"><span class="info-label">الحالة:</span> ${parcel.status === 'pending' ? 'قيد الانتظار' : parcel.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</div>
@@ -1975,19 +2004,19 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
               <div class="total-price">${parcel.price?.toLocaleString('ar-EG')} ${parcel.currency === 'SYP' ? 'ل.س' : 'ريال'}</div>
             </div>
             ` : `
-            <div class="price-section" style="background: #ffffff; border: 2px solid #000000; border-radius: 8px; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="price-section" style="background: #ffffff; border: 2.5px solid #000000; border-radius: 10px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
               <span class="info-label">حالة الشحنة:</span>
-              <div class="total-price" style="font-size: 15px;">${parcel.status === 'pending' ? 'قيد الانتظار' : parcel.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</div>
+              <div class="total-price" style="font-size: 20px;">${parcel.status === 'pending' ? 'قيد الانتظار' : parcel.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}</div>
             </div>
             `}
 
             <!-- أرقام فروع الشحن -->
             <div class="branches-section">
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <div style="font-weight: 900; font-size: 13px; color: #000000;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="font-weight: 900; font-size: 16px; color: #000000;">
                   📞 أرقام فروع الشحن:
                 </div>
-                <div style="display: flex; gap: 20px; align-items: center; font-size: 13px; font-weight: 900; color: #000000;">
+                <div style="display: flex; gap: 24px; align-items: center; font-size: 16px; font-weight: 900; color: #000000;">
                   <span>الرياض: ٠٥٠٠٠٩٤٢١٠</span>
                   <span>جدة: ٠٥٣١١٦٠٠٧٩</span>
                   <span>سوريا: ٠٩٨٩٨٨٩٠٩٢</span>
@@ -1995,9 +2024,9 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
               </div>
             </div>
 
-            <div class="terms-section" style="margin-top: 20px; border: 1.5px solid #000000; border-radius: 8px; padding: 15px; background: #ffffff; font-size: 11px; color: #000000; line-height: 1.8; text-align: right;">
-              <div style="font-size: 13px; font-weight: 900; color: #000000; margin-bottom: 8px; border-bottom: 2px solid #000000; padding-bottom: 4px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
-              <ul style="padding-right: 15px; margin: 0; list-style-type: none; color: #000000;">
+            <div class="terms-section" style="margin-top: 20px; border: 2px solid #000000; border-radius: 10px; padding: 16px; background: #ffffff; font-size: 13.5px; color: #000000; line-height: 1.8; text-align: right; font-weight: bold;">
+              <div style="font-size: 15px; font-weight: 900; color: #000000; margin-bottom: 8px; border-bottom: 2px solid #000000; padding-bottom: 4px; display: inline-block;">شروط وأحكام الشحن والاستلام:</div>
+              <ul style="padding-right: 18px; margin: 0; list-style-type: none; color: #000000;">
                 <li style="margin-bottom: 5px; position: relative; padding-right: 15px; color: #000000;">
                   <span style="position: absolute; right: 0; color: #000000; font-weight: 900;">*</span>
                   الشركة غير مسؤولة عن البضائع إذا لم يتم إستلامها خلال ١٠ أيام وعن سندات الاستلام بعد ١٥ يوم من تاريخ الاستلام.
@@ -2026,11 +2055,11 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
             </div>
 
             <div class="footer">
-              <div style="margin-bottom: 6px; font-size: 12px; font-weight: 900; color: #000000;">
+              <div style="margin-bottom: 8px; font-size: 15px; font-weight: 900; color: #000000;">
                 أرقام فروع الشحن: الرياض: ٠٥٠٠٠٩٤٢١٠ | جدة: ٠٥٣١١٦٠٠٧٩ | سوريا: ٠٩٨٩٨٨٩٠٩٢
               </div>
-              <p style="margin: 3px 0; color: #000000;">شكراً لتعاملكم معنا. يرجى الاحتفاظ بهذه التذكرة لتتبع شحنتكم.</p>
-              <p style="margin: 3px 0; color: #000000;">هذه الوثيقة صدرت إلكترونياً ولا تحتاج لختم.</p>
+              <p style="margin: 4px 0; color: #000000;">شكراً لتعاملكم معنا. يرجى الاحتفاظ بهذه التذكرة لتتبع شحنتكم.</p>
+              <p style="margin: 4px 0; color: #000000;">هذه الوثيقة صدرت إلكترونياً ولا تحتاج لختم.</p>
             </div>
           </div>
           <script>
