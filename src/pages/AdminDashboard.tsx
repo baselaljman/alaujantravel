@@ -197,22 +197,82 @@ export default function AdminDashboard() {
     paymentMethod: 'later',
     status: 'confirmed',
     to: '',
-    isFree: false
+    isFree: false,
+    customPrice: '' as number | string
   });
+
+  const [showPassengerPrintModal, setShowPassengerPrintModal] = useState(false);
+  const [passengerPrintData, setPassengerPrintData] = useState({
+    firstDriver: '',
+    secondDriver: '',
+    busPlateNumber: ''
+  });
+
+  const handleOpenPassengerPrintModal = () => {
+    const trip = trips.find(t => t.id === selectedTripId);
+    if (!trip) return;
+
+    let initialDriver = '';
+    if (trip.driverId) {
+      const d = users.find(u => u.uid === trip.driverId);
+      if (d) initialDriver = d.displayName;
+    }
+
+    let initialPlate = '';
+    if (trip.busNumber) {
+      const matchedBus = buses.find(b => b.busNumber === trip.busNumber || b.plateNumber === trip.busNumber);
+      initialPlate = matchedBus?.plateNumber || trip.busNumber;
+    }
+
+    setPassengerPrintData({
+      firstDriver: initialDriver,
+      secondDriver: '',
+      busPlateNumber: initialPlate
+    });
+    setShowPassengerPrintModal(true);
+  };
+
+  const getDefaultTripPrice = (trip: Trip, destination?: string) => {
+    const fromCityName = trip.from;
+    const fromCity = cities.find(c => c.name === fromCityName);
+    const isSyrianCurrency = fromCity?.country === 'سوريا';
+    const defaultCurrency = isSyrianCurrency ? 'ل.س' : 'ريال';
+
+    const bookingTo = destination || trip.to;
+    if (bookingTo !== trip.to && trip.stops) {
+      const matchedStop = trip.stops.find(s => s.cityName === bookingTo);
+      if (matchedStop) {
+        if (isSyrianCurrency) {
+          return { value: matchedStop.priceSYP || 0, currency: 'ل.س' };
+        } else {
+          return { value: matchedStop.priceSAR || 0, currency: 'ريال' };
+        }
+      }
+    }
+
+    if (isSyrianCurrency) {
+      return { value: trip.priceSYP || 0, currency: 'ل.س' };
+    } else {
+      return { value: trip.priceSAR || trip.price || 0, currency: 'ريال' };
+    }
+  };
 
   useEffect(() => {
     if (selectedTripId) {
       const trip = trips.find(t => t.id === selectedTripId);
       if (trip) {
+        const def = getDefaultTripPrice(trip, trip.to);
         setAdminBookingData(prev => ({
           ...prev,
-          to: trip.to
+          to: trip.to,
+          customPrice: prev.customPrice !== '' ? prev.customPrice : def.value
         }));
       }
     } else {
       setAdminBookingData(prev => ({
         ...prev,
-        to: ''
+        to: '',
+        customPrice: ''
       }));
     }
   }, [selectedTripId, trips]);
@@ -240,6 +300,10 @@ export default function AdminDashboard() {
 
     if (booking.isFree) {
       return { value: 0, currency: defaultCurrency, isFree: true };
+    }
+
+    if (booking.customPrice !== undefined && booking.customPrice !== null && !isNaN(Number(booking.customPrice))) {
+      return { value: Number(booking.customPrice), currency: defaultCurrency };
     }
 
     const bookingTo = booking.to || trip.to;
@@ -992,9 +1056,14 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
     }
   };
 
-  const handlePrintPassengerList = async () => {
+  const handlePrintPassengerList = async (overrideData?: { firstDriver?: string; secondDriver?: string; busPlateNumber?: string }) => {
     const trip = trips.find(t => t.id === selectedTripId);
     if (!trip) return;
+
+    const dataToUse = overrideData || passengerPrintData;
+    const firstDriver = dataToUse.firstDriver || '';
+    const secondDriver = dataToUse.secondDriver || '';
+    const busPlateNumber = dataToUse.busPlateNumber || trip.busNumber || '';
 
     const tripBookings = bookings.filter(b => b.tripId === selectedTripId);
     
@@ -1025,7 +1094,7 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
             .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000000; padding-bottom: 10px; position: relative; color: #000000; }
             .header h1 { margin: 0; font-size: 22px; font-weight: 900; }
             .header p { margin: 3px 0 0 0; font-size: 13px; font-weight: bold; }
-            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; font-size: 14px; background: #ffffff; border: 2px solid #000000; padding: 10px; border-radius: 8px; color: #000000; font-weight: bold; }
+            .trip-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; margin-bottom: 12px; font-size: 13.5px; background: #ffffff; border: 2px solid #000000; padding: 10px 12px; border-radius: 8px; color: #000000; font-weight: bold; }
             .footer { margin-top: 16px; text-align: center; font-size: 12px; color: #000000; font-weight: bold; }
           </style>
         </head>
@@ -1046,33 +1115,34 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                 <div><strong>إلى:</strong> ${trip.to}</div>
                 <div><strong>التاريخ:</strong> ${formatDateArabic(trip.date)}</div>
                 <div><strong>الوقت:</strong> ${trip.time}</div>
+                <div><strong>السائق الأول:</strong> ${firstDriver || '---'}</div>
+                <div><strong>السائق الثاني:</strong> ${secondDriver || '---'}</div>
+                <div><strong>رقم لوحة السيارة:</strong> ${busPlateNumber || '---'}</div>
                 <div><strong>رقم التتبع:</strong> ${trip.trackingNumber || '---'}</div>
                 <div><strong>الركاب في الصفحة:</strong> ${chunk.length} / الإجمالي: ${tripBookings.length}</div>
               </div>
               <table>
                 <thead>
                   <tr>
-                    <th>#</th>
+                    <th style="width: 40px; text-align: center;">#</th>
                     <th>اسم الراكب</th>
                     <th>رقم التواصل</th>
                     <th>رقم الجواز</th>
-                    <th>المقعد</th>
+                    <th style="width: 85px; text-align: center;">المقعد</th>
                     <th>الوجهة</th>
-                    <th>الطرود الإضافية</th>
-                    <th>الحالة</th>
+                    <th style="width: 80px; text-align: center;">الحالة</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${chunk.map((b, i) => `
                     <tr>
-                      <td>${chunkIndex * chunkSize + i + 1}</td>
+                      <td style="text-align: center;">${chunkIndex * chunkSize + i + 1}</td>
                       <td>${b.passengerName} ${b.isFree ? '<span style="color: #2563eb; font-weight: bold;">(مجاني)</span>' : ''}</td>
-                      <td>${b.passengerPhone}</td>
+                      <td dir="ltr" style="text-align: right;">${b.passengerPhone}</td>
                       <td>${b.passportNumber || '---'}</td>
-                      <td>${b.seatNumber && b.seatNumber > 0 ? b.seatNumber : 'بدون تحديد'}</td>
+                      <td style="text-align: center;">${b.seatNumber && b.seatNumber > 0 ? b.seatNumber : 'بدون تحديد'}</td>
                       <td>${b.to || trip.to}</td>
-                      <td>${b.extraParcelsCount ? `${b.extraParcelsCount} طرود` : '---'}</td>
-                      <td>${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
+                      <td style="text-align: center;">${b.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار'}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -1391,7 +1461,8 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
     passportNumber: '',
     seatNumber: 0,
     extraParcelsCount: 0,
-    extraParcelsPrice: 0
+    extraParcelsPrice: 0,
+    customPrice: '' as number | string
   });
 
   useEffect(() => {
@@ -2161,13 +2232,16 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
 
   const startEditingBooking = (booking: any) => {
     setEditingBookingId(booking.id);
+    const trip = trips.find(t => t.id === booking.tripId);
+    const priceInfo = trip ? getBookingPrice(booking, trip) : { value: 0 };
     setEditBookingData({
       passengerName: booking.passengerName,
       passengerPhone: booking.passengerPhone,
       passportNumber: booking.passportNumber || '',
       seatNumber: booking.seatNumber || 0,
       extraParcelsCount: booking.extraParcelsCount || 0,
-      extraParcelsPrice: booking.extraParcelsPrice || 0
+      extraParcelsPrice: booking.extraParcelsPrice || 0,
+      customPrice: booking.customPrice !== undefined ? booking.customPrice : (booking.isFree ? 0 : priceInfo.value)
     });
   };
 
@@ -2176,10 +2250,21 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
       const oldBooking = bookings.find(b => b.id === bookingId);
       if (!oldBooking) return;
 
+      const updateData: any = {
+        passengerName: editBookingData.passengerName,
+        passengerPhone: editBookingData.passengerPhone,
+        passportNumber: editBookingData.passportNumber,
+        seatNumber: editBookingData.seatNumber,
+        extraParcelsCount: editBookingData.extraParcelsCount,
+        extraParcelsPrice: editBookingData.extraParcelsPrice
+      };
+
+      if (editBookingData.customPrice !== '' && !isNaN(Number(editBookingData.customPrice))) {
+        updateData.customPrice = Number(editBookingData.customPrice);
+      }
+
       // Update the booking document
-      await updateDoc(doc(db, 'bookings', bookingId), {
-        ...editBookingData
-      });
+      await updateDoc(doc(db, 'bookings', bookingId), updateData);
 
       // If seat number changed, update the trip's bookedSeats
       if (oldBooking.seatNumber !== editBookingData.seatNumber) {
@@ -2206,7 +2291,7 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
     const trip = trips.find(t => t.id === selectedTripId);
     if (!trip) return;
 
-    const { passengerName, passengerPhone, passportNumber, seatNumber, paymentMethod, status, to, isFree } = adminBookingData;
+    const { passengerName, passengerPhone, passportNumber, seatNumber, paymentMethod, status, to, isFree, customPrice } = adminBookingData;
 
     if (!passengerName.trim()) {
       setError('يرجى إدخال اسم المسافر');
@@ -2261,6 +2346,10 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
         isFree: !!isFree
       };
 
+      if (!isFree && customPrice !== '' && !isNaN(Number(customPrice))) {
+        bookingData.customPrice = Number(customPrice);
+      }
+
       await addDoc(collection(db, 'bookings'), bookingData);
 
       // 3. Update trip bookedSeats & availableSeats
@@ -2278,6 +2367,7 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
 
       setSuccess('تم إضافة الحجز بنجاح');
       setShowAddBookingForm(false);
+      const def = getDefaultTripPrice(trip, trip.to);
       setAdminBookingData({
         passengerName: '',
         passengerPhone: '',
@@ -2286,7 +2376,8 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
         paymentMethod: 'later',
         status: 'confirmed',
         to: trip.to,
-        isFree: false
+        isFree: false,
+        customPrice: def.value
       });
     } catch (err: any) {
       console.error('Error adding admin booking:', err);
@@ -2614,6 +2705,132 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                   <button 
                     onClick={() => setDirectNotificationBooking(null)} 
                     className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors text-sm"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* Passenger Manifest Print Modal */}
+          {showPassengerPrintModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl text-right space-y-5"
+                dir="rtl"
+              >
+                <div className="flex justify-between items-center pb-3 border-b border-stone-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <Printer size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-stone-900">بيانات طباعة كشف الركاب</h3>
+                      <p className="text-xs text-stone-500 font-medium">إدخال بيانات السائقين ورقم اللوحة للكشف الكامل</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowPassengerPrintModal(false)}
+                    className="p-1.5 hover:bg-stone-100 rounded-full text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {(() => {
+                  const trip = trips.find(t => t.id === selectedTripId);
+                  return trip ? (
+                    <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200 text-xs text-stone-700 flex flex-wrap gap-x-4 gap-y-1 font-bold">
+                      <span>الرحلة: {trip.from} ➔ {trip.to}</span>
+                      <span>التاريخ: {formatDateArabic(trip.date)}</span>
+                      <span>الوقت: {trip.time}</span>
+                    </div>
+                  ) : null;
+                })()}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      السائق الأول
+                    </label>
+                    <input 
+                      type="text" 
+                      list="manifest-driver-first-list"
+                      value={passengerPrintData.firstDriver}
+                      onChange={e => setPassengerPrintData(prev => ({ ...prev, firstDriver: e.target.value }))}
+                      placeholder="اسم السائق الأول (يدوي أو اختيار)"
+                      className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm font-bold text-stone-800 outline-none focus:ring-2 focus:ring-emerald-500 text-right"
+                    />
+                    <datalist id="manifest-driver-first-list">
+                      {users.filter(u => u.role === 'driver').map(d => (
+                        <option key={d.uid} value={d.displayName} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      السائق الثاني (اختياري)
+                    </label>
+                    <input 
+                      type="text" 
+                      list="manifest-driver-second-list"
+                      value={passengerPrintData.secondDriver}
+                      onChange={e => setPassengerPrintData(prev => ({ ...prev, secondDriver: e.target.value }))}
+                      placeholder="اسم السائق الثاني (يدوي أو اختيار)"
+                      className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm font-bold text-stone-800 outline-none focus:ring-2 focus:ring-emerald-500 text-right"
+                    />
+                    <datalist id="manifest-driver-second-list">
+                      {users.filter(u => u.role === 'driver').map(d => (
+                        <option key={d.uid} value={d.displayName} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      رقم لوحة السيارة / الحافلة
+                    </label>
+                    <input 
+                      type="text" 
+                      list="manifest-bus-plate-list"
+                      value={passengerPrintData.busPlateNumber}
+                      onChange={e => setPassengerPrintData(prev => ({ ...prev, busPlateNumber: e.target.value }))}
+                      placeholder="مثال: أ ب ج 1234 أو رقم الحافلة"
+                      className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm font-bold text-stone-800 outline-none focus:ring-2 focus:ring-emerald-500 text-right"
+                    />
+                    <datalist id="manifest-bus-plate-list">
+                      {buses.map(b => (
+                        <option key={b.id} value={b.plateNumber || b.busNumber}>
+                          {b.plateNumber} (حافلة {b.busNumber})
+                        </option>
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 font-medium leading-relaxed">
+                    ✓ ستظهر أسماء السائقين ورقم اللوحة في ترويسة الكشف الكامل، ولن يظهر عمود الطرود الإضافية بالكشف.
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-3 border-t border-stone-100">
+                  <button 
+                    onClick={() => {
+                      const dataToPrint = { ...passengerPrintData };
+                      setShowPassengerPrintModal(false);
+                      handlePrintPassengerList(dataToPrint);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                  >
+                    <Printer size={18} />
+                    طباعة الكشف الآن
+                  </button>
+                  <button 
+                    onClick={() => setShowPassengerPrintModal(false)}
+                    className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors"
                   >
                     إلغاء
                   </button>
@@ -3461,14 +3678,28 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                     <h3 className="font-bold text-emerald-600">قائمة الحجوزات</h3>
                     <div className="flex gap-2">
                       <button 
-                        onClick={() => setShowAddBookingForm(!showAddBookingForm)}
+                        onClick={() => {
+                          const nextState = !showAddBookingForm;
+                          setShowAddBookingForm(nextState);
+                          if (nextState) {
+                            const trip = trips.find(t => t.id === selectedTripId);
+                            if (trip) {
+                              const def = getDefaultTripPrice(trip, adminBookingData.to || trip.to);
+                              setAdminBookingData(prev => ({
+                                ...prev,
+                                to: prev.to || trip.to,
+                                customPrice: prev.customPrice !== '' ? prev.customPrice : def.value
+                              }));
+                            }
+                          }
+                        }}
                         className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm transition-colors font-bold shadow-sm"
                       >
                         <Plus size={16} />
                         إضافة حجز يدوي
                       </button>
                       <button 
-                        onClick={handlePrintPassengerList}
+                        onClick={handleOpenPassengerPrintModal}
                         className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2 rounded-xl text-sm transition-colors"
                       >
                         <Printer size={16} />
@@ -3549,7 +3780,16 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                           <label className="text-xs font-bold text-stone-500">الوجهة (المحطة) *</label>
                           <select
                             value={adminBookingData.to || ''}
-                            onChange={e => setAdminBookingData({...adminBookingData, to: e.target.value})}
+                            onChange={e => {
+                              const newTo = e.target.value;
+                              const trip = trips.find(t => t.id === selectedTripId);
+                              const newDef = trip ? getDefaultTripPrice(trip, newTo) : null;
+                              setAdminBookingData(prev => ({
+                                ...prev,
+                                to: newTo,
+                                customPrice: newDef ? newDef.value : prev.customPrice
+                              }));
+                            }}
                             className="w-full bg-stone-50 border border-stone-200 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-right"
                           >
                             {(() => {
@@ -3614,6 +3854,83 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                         </div>
 
                         <div className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-stone-500">سعر التذكرة المعتمد للمسافر *</label>
+                            {(() => {
+                              const trip = trips.find(t => t.id === selectedTripId);
+                              if (!trip) return null;
+                              const def = getDefaultTripPrice(trip, adminBookingData.to);
+                              const isModified = adminBookingData.customPrice !== '' && !adminBookingData.isFree && Number(adminBookingData.customPrice) !== def.value;
+                              if (!isModified) return null;
+                              return (
+                                <button 
+                                  type="button"
+                                  onClick={() => setAdminBookingData(prev => ({ ...prev, customPrice: def.value }))}
+                                  className="text-[10px] text-emerald-600 hover:text-emerald-700 underline font-bold"
+                                  title="استعادة السعر الافتراضي للرحلة"
+                                >
+                                  استعادة السعر ({def.value} {def.currency})
+                                </button>
+                              );
+                            })()}
+                          </div>
+                          <div className="relative">
+                            <input 
+                              type="number" 
+                              min="0"
+                              disabled={adminBookingData.isFree}
+                              placeholder="أدخل سعر التذكرة"
+                              value={
+                                adminBookingData.isFree 
+                                  ? 0 
+                                  : (adminBookingData.customPrice !== '' 
+                                      ? adminBookingData.customPrice 
+                                      : (() => {
+                                          const trip = trips.find(t => t.id === selectedTripId);
+                                          return trip ? getDefaultTripPrice(trip, adminBookingData.to).value : '';
+                                        })()
+                                    )
+                              }
+                              onChange={e => {
+                                const val = e.target.value;
+                                setAdminBookingData({
+                                  ...adminBookingData,
+                                  customPrice: val === '' ? '' : Number(val)
+                                });
+                              }}
+                              className={`w-full border p-3 rounded-xl text-sm outline-none transition-all font-bold text-right disabled:opacity-60 ${
+                                (() => {
+                                  const trip = trips.find(t => t.id === selectedTripId);
+                                  const def = trip ? getDefaultTripPrice(trip, adminBookingData.to) : { value: 0 };
+                                  return adminBookingData.customPrice !== '' && !adminBookingData.isFree && Number(adminBookingData.customPrice) !== def.value
+                                    ? 'bg-amber-50/70 border-amber-300 text-amber-900 focus:ring-2 focus:ring-amber-500'
+                                    : 'bg-stone-50 border-stone-200 text-stone-900 focus:ring-2 focus:ring-emerald-500';
+                                })()
+                              }`}
+                            />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-400">
+                              {(() => {
+                                const trip = trips.find(t => t.id === selectedTripId);
+                                return trip ? getDefaultTripPrice(trip, adminBookingData.to).currency : 'ريال';
+                              })()}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-stone-400">
+                            {adminBookingData.isFree 
+                              ? 'تم تحديد هذا الحجز كمجاني (0)'
+                              : (() => {
+                                  const trip = trips.find(t => t.id === selectedTripId);
+                                  const def = trip ? getDefaultTripPrice(trip, adminBookingData.to) : { value: 0, currency: 'ريال' };
+                                  const isModified = adminBookingData.customPrice !== '' && Number(adminBookingData.customPrice) !== def.value;
+                                  if (isModified) {
+                                    return `✏️ تم تعديل السعر لهذا المسافر: ${adminBookingData.customPrice} ${def.currency} (الافتراضي: ${def.value} ${def.currency})`;
+                                  }
+                                  return `السعر الافتراضي للوجهة (${def.value} ${def.currency}). يمكنك تعديله لهذا المسافر.`;
+                                })()}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1">
                           <label className="text-xs font-bold text-stone-500">طريقة الدفع</label>
                           <select
                             disabled={adminBookingData.isFree}
@@ -3663,18 +3980,34 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                       {(() => {
                         const trip = trips.find(t => t.id === selectedTripId);
                         if (!trip) return null;
-                        const tempBooking = {
-                          from: trip.from,
-                          to: adminBookingData.to || trip.to,
-                          tripId: trip.id,
-                          isFree: adminBookingData.isFree,
-                        } as Booking;
-                        const priceInfo = getBookingPrice(tempBooking, trip);
+                        const def = getDefaultTripPrice(trip, adminBookingData.to);
+                        const isCustom = !adminBookingData.isFree && adminBookingData.customPrice !== '' && Number(adminBookingData.customPrice) !== def.value;
+                        const effectivePrice = adminBookingData.isFree ? 0 : (adminBookingData.customPrice !== '' ? Number(adminBookingData.customPrice) : def.value);
+
                         return (
-                          <div className={`p-4 rounded-2xl border flex justify-between items-center text-sm font-bold ${adminBookingData.isFree ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-emerald-50 border-emerald-100 text-emerald-800'}`} dir="rtl">
-                            <span>{adminBookingData.isFree ? 'حالة التكلفة (حجز مجاني):' : 'سعر التذكرة المعتمد لهذه الوجهة:'}</span>
-                            <span className={`text-lg font-bold ${adminBookingData.isFree ? 'text-blue-600' : 'text-emerald-600'}`}>
-                              {adminBookingData.isFree ? 'مجاني (0)' : `${priceInfo.value} ${priceInfo.currency}`}
+                          <div className={`p-4 rounded-2xl border flex justify-between items-center text-sm font-bold ${
+                            adminBookingData.isFree 
+                              ? 'bg-blue-50 border-blue-200 text-blue-900' 
+                              : isCustom 
+                                ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-sm' 
+                                : 'bg-emerald-50 border-emerald-100 text-emerald-800'
+                          }`} dir="rtl">
+                            <div className="flex flex-col">
+                              <span>
+                                {adminBookingData.isFree 
+                                  ? 'حالة التكلفة (حجز مجاني):' 
+                                  : isCustom 
+                                    ? 'سعر التذكرة النهائي للمسافر (سعر خاص معدل):' 
+                                    : 'سعر التذكرة المعتمد لهذه الوجهة:'}
+                              </span>
+                              {isCustom && (
+                                <span className="text-[11px] font-normal text-amber-700 mt-0.5">
+                                  السعر الافتراضي للرحلة: {def.value} {def.currency}
+                                </span>
+                              )}
+                            </div>
+                            <span className={`text-xl font-black ${adminBookingData.isFree ? 'text-blue-600' : isCustom ? 'text-amber-700' : 'text-emerald-600'}`}>
+                              {adminBookingData.isFree ? 'مجاني (0)' : `${effectivePrice} ${def.currency}`}
                             </span>
                           </div>
                         );
@@ -3730,24 +4063,35 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                                     className="bg-white border p-1 rounded w-full text-xs"
                                     placeholder="رقم الهاتف"
                                   />
-                                  <div className="flex gap-2">
-                                    <div className="flex-1">
-                                      <label className="text-[9px] text-stone-450 block font-bold">الطرود الإضافية</label>
+                                  <div className="grid grid-cols-3 gap-1.5">
+                                    <div>
+                                      <label className="text-[9px] text-stone-450 block font-bold">سعر التذكرة</label>
                                       <input 
                                         type="number" 
                                         min="0"
-                                        placeholder="عدد الطرود"
+                                        placeholder="السعر"
+                                        value={editBookingData.customPrice !== undefined ? editBookingData.customPrice : ''} 
+                                        onChange={e => setEditBookingData({...editBookingData, customPrice: e.target.value === '' ? '' : Number(e.target.value)})}
+                                        className="bg-white border p-1 rounded w-full text-xs font-bold text-emerald-700"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[9px] text-stone-450 block font-bold">الطرود</label>
+                                      <input 
+                                        type="number" 
+                                        min="0"
+                                        placeholder="العدد"
                                         value={editBookingData.extraParcelsCount || 0} 
                                         onChange={e => setEditBookingData({...editBookingData, extraParcelsCount: Number(e.target.value)})}
                                         className="bg-white border p-1 rounded w-full text-xs animate-none"
                                       />
                                     </div>
-                                    <div className="flex-1">
-                                      <label className="text-[9px] text-stone-450 block font-bold">السعر الإضافي</label>
+                                    <div>
+                                      <label className="text-[9px] text-stone-450 block font-bold">سعر الطرود</label>
                                       <input 
                                         type="number" 
                                         min="0"
-                                        placeholder="السعر الإضافي"
+                                        placeholder="السعر"
                                         value={editBookingData.extraParcelsPrice || 0} 
                                         onChange={e => setEditBookingData({...editBookingData, extraParcelsPrice: Number(e.target.value)})}
                                         className="bg-white border p-1 rounded w-full text-xs animate-none"
@@ -3759,11 +4103,18 @@ ${trip?.trackingNumber ? `• *رقم تتبع الرحلة:* ${trip.trackingNum
                                 <>
                                   <p className="font-bold flex items-center gap-1.5 flex-wrap">
                                     <span>{booking.passengerName}</span>
-                                    {booking.isFree && (
+                                    {booking.isFree ? (
                                       <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold border border-blue-200">
                                         مجاني
                                       </span>
-                                    )}
+                                    ) : booking.customPrice !== undefined ? (
+                                      <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold border border-amber-200" title="تم تعديل سعر التذكرة لهذا المسافر">
+                                        سعر خاص: {booking.customPrice} {(() => {
+                                          const tripObj = trips.find(t => t.id === booking.tripId);
+                                          return tripObj ? getBookingPrice(booking, tripObj).currency : 'ريال';
+                                        })()}
+                                      </span>
+                                    ) : null}
                                   </p>
                                   <p className="text-xs text-stone-400">{booking.passengerPhone}</p>
                                   {booking.from && booking.to && (

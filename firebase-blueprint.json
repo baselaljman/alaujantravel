@@ -34,7 +34,13 @@
         "passportNumber": { "type": "string", "description": "Passport number of the passenger" },
         "paymentMethod": { "type": "string", "enum": ["online", "later"], "description": "Payment method chosen" },
         "bookingDate": { "type": "string", "format": "date-time", "description": "When the booking was made" },
-        "status": { "type": "string", "enum": ["confirmed", "pending", "cancelled"], "description": "Status of the booking" }
+        "status": { "type": "string", "enum": ["confirmed", "pending", "cancelled"], "description": "Status of the booking" },
+        "from": { "type": "string", "description": "Departure city" },
+        "to": { "type": "string", "description": "Destination city" },
+        "customPrice": { "type": "number", "description": "Custom ticket price for this passenger" },
+        "isFree": { "type": "boolean", "description": "Whether the booking is free for the customer" },
+        "extraParcelsCount": { "type": "integer", "description": "Count of extra baggage/parcels" },
+        "extraParcelsPrice": { "type": "number", "description": "Extra price for parcels" }
       },
       "required": ["tripId", "userId", "seatNumber", "passengerName", "passengerPhone"]
     },

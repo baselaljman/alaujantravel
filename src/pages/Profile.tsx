@@ -32,6 +32,15 @@ export default function Profile() {
     const fromCityName = booking.from || trip.from;
     const fromCity = cities.find(c => c.name === fromCityName);
     const isSyrianCurrency = fromCity?.country === 'سوريا';
+    const defaultCurrency = isSyrianCurrency ? 'ل.س' : 'ريال';
+
+    if (booking.isFree) {
+      return { value: 0, currency: defaultCurrency, isFree: true };
+    }
+
+    if (booking.customPrice !== undefined && booking.customPrice !== null && !isNaN(Number(booking.customPrice))) {
+      return { value: Number(booking.customPrice), currency: defaultCurrency };
+    }
 
     const bookingTo = booking.to || trip.to;
     if (bookingTo !== trip.to && trip.stops) {
